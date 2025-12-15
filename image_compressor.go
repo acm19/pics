@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"image/jpeg"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ImageCompressor defines the interface for compressing images
@@ -54,43 +53,13 @@ func (c *jpegCompressor) CompressDirectory(dir string, quality int) error {
 	return nil
 }
 
-// CompressFile re-encodes a single JPEG file at the specified quality
+// CompressFile compresses a single JPEG file using jpegoptim (preserves EXIF)
 func (c *jpegCompressor) CompressFile(path string, quality int) error {
-	info, err := os.Stat(path)
+	// jpegoptim preserves EXIF data and file modification time by default with -p flag
+	cmd := exec.Command("jpegoptim", fmt.Sprintf("-m%d", quality), "-p", path)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("jpegoptim failed for %s: %w, output: %s", path, err, output)
 	}
-	modTime := info.ModTime()
-
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	img, err := jpeg.Decode(file)
-	if err != nil {
-		return err
-	}
-	file.Close()
-
-	tmpPath := path + ".tmp"
-	outFile, err := os.Create(tmpPath)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmpPath)
-
-	opts := &jpeg.Options{Quality: quality}
-	if err := jpeg.Encode(outFile, img, opts); err != nil {
-		outFile.Close()
-		return err
-	}
-	outFile.Close()
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		return err
-	}
-
-	return os.Chtimes(path, time.Now(), modTime)
+	return nil
 }

@@ -12,6 +12,33 @@ A Go application for organising and compressing photos and videos. Replicates th
 - Preserves file modification times.
 - Structured logging with debug mode.
 
+## Requirements
+
+- Go 1.21 or later.
+- `jpegoptim` - for JPEG compression with EXIF preservation.
+
+### Installing jpegoptim
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install jpegoptim
+```
+
+**macOS:**
+```bash
+brew install jpegoptim
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install jpegoptim
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S jpegoptim
+```
+
 ## Building
 
 ```bash
@@ -22,8 +49,16 @@ This creates a `parse-pics` binary in the current directory.
 
 ## Usage
 
+### Run the compiled binary
+
 ```bash
 ./parse-pics SOURCE_DIR TARGET_DIR
+```
+
+### Run without compiling
+
+```bash
+make run ARGS="/path/to/source /path/to/target"
 ```
 
 ### Arguments

@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,22 +28,31 @@ type ParseOptions struct {
 	JPEGQuality int
 	// TempDirName is the name of the temporary directory to use
 	TempDirName string
+	// MaxConcurrency is the maximum number of files to process concurrently (0 = unlimited)
+	MaxConcurrency int
 }
 
 // DefaultParseOptions returns the default parsing options
 func DefaultParseOptions() ParseOptions {
-	return ParseOptions{CompressJPEGs: true, JPEGQuality: 50, TempDirName: "tmp_image"}
+	return ParseOptions{
+		CompressJPEGs:  true,
+		JPEGQuality:    50,
+		TempDirName:    "tmp_image",
+		MaxConcurrency: 100,
+	}
 }
 
 // mediaParser implements the MediaParser interface
 type mediaParser struct {
 	compressor ImageCompressor
+	organiser  FileOrganiser
 }
 
 // NewMediaParser creates a new MediaParser instance
 func NewMediaParser() MediaParser {
 	return &mediaParser{
 		compressor: NewImageCompressor(),
+		organiser:  NewFileOrganiser(),
 	}
 }
 
@@ -73,40 +82,97 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 	}
 	defer os.RemoveAll(tmpTarget)
 
-	logger.Info("Copying media files", "source", sourceDir, "target", tmpTarget)
-	if err := p.copyMediaFiles(sourceDir, tmpTarget); err != nil {
-		return fmt.Errorf("failed to copy media files: %w", err)
+	logger.Info("Processing media files (copy and compress)", "source", sourceDir, "target", tmpTarget)
+	processStart := time.Now()
+	if err := p.copyAndCompressFiles(sourceDir, tmpTarget, opts); err != nil {
+		return fmt.Errorf("failed to process media files: %w", err)
 	}
-
-	if opts.CompressJPEGs {
-		logger.Info("Compressing JPEGs", "quality", opts.JPEGQuality)
-		if err := p.compressor.CompressDirectory(tmpTarget, opts.JPEGQuality); err != nil {
-			return fmt.Errorf("failed to compress JPEGs: %w", err)
-		}
-	} else {
-		logger.Info("Skipping JPEG compression")
-	}
+	processDuration := time.Since(processStart)
+	logger.Info("Processing completed", "duration_seconds", processDuration.Seconds())
 
 	logger.Info("Organising files by date")
-	if err := p.organiseByDate(tmpTarget, targetDir); err != nil {
+	if err := p.organiser.OrganiseByDate(tmpTarget, targetDir); err != nil {
 		return fmt.Errorf("failed to organise by date: %w", err)
 	}
 
-	logger.Info("Final organisation (videos and renaming)")
-	if err := p.finalOrganisation(targetDir); err != nil {
-		return fmt.Errorf("failed in final organisation: %w", err)
+	logger.Info("Organising videos and renaming JPGs")
+	if err := p.organiser.OrganiseVideosAndRenameJPGs(targetDir); err != nil {
+		return fmt.Errorf("failed to organise videos and rename JPGs: %w", err)
 	}
 
 	logger.Info("Processing complete")
 	return nil
 }
 
-// copyMediaFiles copies MOV and JPG files from source subdirectories
-func (p *mediaParser) copyMediaFiles(sourceDir, tmpTarget string) error {
-	entries, err := os.ReadDir(sourceDir)
-	if err != nil {
+type fileToProcess struct {
+	srcPath  string
+	destPath string
+	isJPEG   bool
+}
+
+// copyAndCompressFiles copies and optionally compresses files in parallel using a worker pool
+func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts ParseOptions) error {
+	// Determine number of workers
+	numWorkers := opts.MaxConcurrency
+	if numWorkers <= 0 {
+		numWorkers = 100 // Default if unlimited
+	}
+
+	jobs := make(chan fileToProcess, numWorkers)
+	var wg sync.WaitGroup
+	errChan := make(chan error, numWorkers)
+
+	// Start worker pool
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go p.processFileWorker(jobs, errChan, opts, &wg)
+	}
+
+	// Discover and send files to workers
+	go p.discoverFiles(sourceDir, tmpTarget, jobs)
+
+	wg.Wait()
+	close(errChan)
+
+	if err := <-errChan; err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// processFileWorker processes files from the jobs channel
+func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<- error, opts ParseOptions, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for file := range jobs {
+		logger.Debug("Copying file", "from", file.srcPath, "to", file.destPath)
+		if err := copyFilePreserveTime(file.srcPath, file.destPath); err != nil {
+			errChan <- fmt.Errorf("failed to copy %s: %w", file.srcPath, err)
+			continue
+		}
+
+		if file.isJPEG && opts.CompressJPEGs {
+			logger.Debug("Compressing file", "path", file.destPath)
+			if err := p.compressor.CompressFile(file.destPath, opts.JPEGQuality); err != nil {
+				errChan <- fmt.Errorf("failed to compress %s: %w", file.destPath, err)
+				continue
+			}
+		}
+
+		logger.Debug("Finished processing file", "path", file.destPath)
+	}
+}
+
+// discoverFiles walks directories and sends files to the jobs channel
+func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) {
+	defer close(jobs)
+
+	entries, err := os.ReadDir(sourceDir)
+	if err != nil {
+		logger.Error("Failed to read source directory", "error", err)
+		return
+	}
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -114,25 +180,23 @@ func (p *mediaParser) copyMediaFiles(sourceDir, tmpTarget string) error {
 		prefix := entry.Name()
 		subDir := filepath.Join(sourceDir, entry.Name())
 		logger.Debug("Processing subdirectory", "dir", prefix)
-		err := filepath.Walk(subDir, func(path string, info os.FileInfo, err error) error {
+
+		filepath.Walk(subDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return err
 			}
 			ext := strings.ToUpper(filepath.Ext(path))
 			if ext == ".MOV" || ext == ".JPG" {
 				destPath := filepath.Join(tmpTarget, fmt.Sprintf("%s-%s", prefix, filepath.Base(path)))
-				logger.Debug("Copying file", "from", path, "to", destPath)
-				if err := copyFilePreserveTime(path, destPath); err != nil {
-					return fmt.Errorf("failed to copy %s: %w", path, err)
+				jobs <- fileToProcess{
+					srcPath:  path,
+					destPath: destPath,
+					isJPEG:   ext == ".JPG",
 				}
 			}
 			return nil
 		})
-		if err != nil {
-			return err
-		}
 	}
-	return nil
 }
 
 // copyFilePreserveTime copies a file and preserves its modification time
@@ -157,93 +221,6 @@ func copyFilePreserveTime(src, dst string) error {
 		return err
 	}
 	return os.Chtimes(dst, time.Now(), srcInfo.ModTime())
-}
-
-// organiseByDate moves files to date-based directories
-func (p *mediaParser) organiseByDate(tmpTarget, targetDir string) error {
-	entries, err := os.ReadDir(tmpTarget)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		filePath := filepath.Join(tmpTarget, entry.Name())
-		info, err := os.Stat(filePath)
-		if err != nil {
-			return err
-		}
-		dirName := info.ModTime().Format("2006 01 January 02")
-		destDir := filepath.Join(targetDir, dirName)
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			return err
-		}
-		if err := os.Rename(filePath, filepath.Join(destDir, entry.Name())); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// finalOrganisation organises videos into subdirectories and renames JPGs
-func (p *mediaParser) finalOrganisation(targetDir string) error {
-	entries, err := os.ReadDir(targetDir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		dirPath := filepath.Join(targetDir, entry.Name())
-		if err := p.organiseVideos(dirPath); err != nil {
-			return err
-		}
-		if err := p.renameJPGs(dirPath, entry.Name()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// organiseVideos moves MOV files to a videos subdirectory
-func (p *mediaParser) organiseVideos(dir string) error {
-	files, err := filepath.Glob(filepath.Join(dir, "*.MOV"))
-	if err != nil || len(files) == 0 {
-		return err
-	}
-	videosDir := filepath.Join(dir, "videos")
-	if err := os.MkdirAll(videosDir, 0755); err != nil {
-		return err
-	}
-	for _, file := range files {
-		if err := os.Rename(file, filepath.Join(videosDir, filepath.Base(file))); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// renameJPGs renames JPG files with a sequential pattern
-func (p *mediaParser) renameJPGs(dir, dirName string) error {
-	files, err := filepath.Glob(filepath.Join(dir, "*.JPG"))
-	if err != nil || len(files) == 0 {
-		return err
-	}
-	sort.Strings(files)
-	parts := strings.Fields(dirName)
-	if len(parts) != 4 {
-		return fmt.Errorf("unexpected directory name format: %s", dirName)
-	}
-	picsName := strings.Join(parts, "_")
-	for i, file := range files {
-		newPath := filepath.Join(dir, fmt.Sprintf("%s_%05d.jpg", picsName, i+1))
-		if err := os.Rename(file, newPath); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GetFileCount returns the number of files in a directory recursively
