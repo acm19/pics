@@ -75,7 +75,12 @@ func parse() {
 		os.Exit(1)
 	}
 
-	logger.Info("Summary", "source_files", sourceCount, "target_files", targetCount)
+	if sourceCount != targetCount {
+		logger.Error("File count mismatch", "source_files", sourceCount, "target_files", targetCount, "difference", targetCount-sourceCount)
+		os.Exit(1)
+	}
+
+	logger.Info("Processing completed successfully", "files_processed", sourceCount, "verification", "source and target file counts match")
 }
 
 func rename() {
