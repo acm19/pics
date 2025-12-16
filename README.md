@@ -16,6 +16,7 @@ A Go application for organising and compressing photos and videos. Replicates th
 
 - Go 1.21 or later.
 - `jpegoptim` - for JPEG compression with EXIF preservation.
+- AWS credentials configured (for S3 backup feature) - via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or `~/.aws/credentials` file.
 
 ### Installing jpegoptim
 
@@ -90,10 +91,52 @@ make run ARGS="rename '/path/to/2025 12 December 15' Vacation"
 #         Images: 2025_12_December_15_NewName_00001.jpg
 ```
 
+### Backup directories to S3
+
+```bash
+# Using compiled binary
+./parse-pics backup SOURCE_DIR BUCKET
+
+# Using make
+make run ARGS="backup /path/to/organised/pics my-backup-bucket"
+```
+
+**Arguments:**
+- `SOURCE_DIR` - Directory containing date-based subdirectories to backup.
+- `BUCKET` - S3 bucket name where archives will be uploaded.
+
+**How it works:**
+- Creates tar.gz archives of each subdirectory in a temporary location (`/tmp/<random>_pic`).
+- Counts images and videos in each directory and includes counts in the S3 object key.
+- Checks if objects already exist in S3 using MD5 hash comparison.
+- Skips upload if identical archive already exists.
+- Fails with error if object exists but hash differs (manual intervention required).
+- Uploads new archives to S3 with format: `directory-name (X images, Y videos).tar.gz`.
+- Processes directories in parallel (configurable, default 5).
+- Automatically cleans up temporary files after each upload.
+
+**Examples:**
+```bash
+# Basic backup with default concurrency (5)
+./parse-pics backup /pics/organised my-backup-bucket
+
+# Custom concurrency level
+MAX_CONCURRENT=3 ./parse-pics backup /pics/organised my-backup-bucket
+
+# With debug logging
+DEBUG=1 ./parse-pics backup /pics/organised my-backup-bucket
+```
+
+**S3 object naming:**
+Archives are named with image and video counts:
+- `2025 12 December 15 Vacation (42 images, 3 videos).tar.gz`
+- `2025 11 November 20 (15 images, 0 videos).tar.gz`
+
 ### Environment Variables
 
 - `RATE` - JPEG compression quality (0-100, default: 50).
 - `DEBUG` - Enable debug logging (set to any non-empty value).
+- `MAX_CONCURRENT` - Maximum concurrent backup operations for S3 backup (default: 5).
 
 ### Examples
 

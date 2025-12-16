@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -19,6 +20,8 @@ func main() {
 		parse()
 	case "rename":
 		rename()
+	case "backup":
+		backup()
 	default:
 		printUsage()
 		os.Exit(1)
@@ -29,7 +32,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `Usage:
   %s parse SOURCE_DIR TARGET_DIR    Process and organise media files
   %s rename DIRECTORY NAME          Rename a date-based directory and its images
-`, os.Args[0], os.Args[0])
+  %s backup SOURCE_DIR BUCKET       Backup directories to S3
+`, os.Args[0], os.Args[0], os.Args[0])
 }
 
 func parse() {
@@ -99,4 +103,50 @@ func rename() {
 	}
 
 	logger.Info("Rename completed successfully")
+}
+
+func backup() {
+	if len(os.Args) != 4 {
+		logger.Error("Invalid arguments", "usage", os.Args[0]+" backup SOURCE_DIR BUCKET")
+		os.Exit(1)
+	}
+
+	sourceDir := os.Args[2]
+	bucket := os.Args[3]
+
+	// Get max concurrent workers from environment variable, default to 5
+	maxConcurrent := 5
+	if concurrency := os.Getenv("MAX_CONCURRENT"); concurrency != "" {
+		parsedConcurrency, err := strconv.Atoi(concurrency)
+		if err != nil {
+			logger.Error("Invalid MAX_CONCURRENT value", "value", concurrency, "error", err)
+			os.Exit(1)
+		}
+		maxConcurrent = parsedConcurrency
+	}
+
+	// Validate source directory exists
+	if info, err := os.Stat(sourceDir); err != nil {
+		logger.Error("Source directory does not exist", "directory", sourceDir, "error", err)
+		os.Exit(1)
+	} else if !info.IsDir() {
+		logger.Error("Source path is not a directory", "path", sourceDir)
+		os.Exit(1)
+	}
+
+	// Create S3 backup instance
+	ctx := context.Background()
+	s3Backup, err := NewS3Backup(ctx)
+	if err != nil {
+		logger.Error("Failed to initialize S3 client", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("Starting backup", "source", sourceDir, "bucket", bucket, "max_concurrent", maxConcurrent)
+	if err := s3Backup.BackupDirectories(sourceDir, bucket, maxConcurrent); err != nil {
+		logger.Error("Backup failed", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("Backup completed successfully")
 }
