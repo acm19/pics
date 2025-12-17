@@ -16,8 +16,43 @@ deploy:
 			TransitionToGlacierDays=$(GLACIER_TRANSITION_DAYS) \
 		--no-fail-on-empty-changeset
 
+.PHONY: empty-bucket
+empty-bucket:
+	@echo "Emptying S3 bucket..."
+	@BUCKET_NAME=$$(aws cloudformation describe-stacks \
+		--stack-name $(STACK_NAME) \
+		--query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+		--output text 2>/dev/null); \
+	if [ -n "$$BUCKET_NAME" ]; then \
+		echo "Bucket name: $$BUCKET_NAME"; \
+		echo "Deleting all object versions and delete markers..."; \
+		while true; do \
+			VERSIONS=$$(aws s3api list-object-versions \
+				--bucket "$$BUCKET_NAME" \
+				--max-items 1000 \
+				--query '{Objects: Versions[].{Key:Key,VersionId:VersionId}, DeleteMarkers: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
+				--output json 2>/dev/null || echo '{}'); \
+			OBJECTS=$$(echo "$$VERSIONS" | python3 -c "import sys, json; data = json.load(sys.stdin); objs = (data.get('Objects') or []) + (data.get('DeleteMarkers') or []); print(json.dumps(objs))" 2>/dev/null || echo '[]'); \
+			OBJECTS=$${OBJECTS:-[]}; \
+			if [ "$$OBJECTS" = "[]" ] || [ -z "$$OBJECTS" ]; then \
+				echo "No more objects to delete"; \
+				break; \
+			fi; \
+			echo "Deleting batch of $$(echo "$$OBJECTS" | python3 -c "import sys, json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "unknown") objects..."; \
+			echo "$$OBJECTS" | python3 -c "import sys, json; objs = json.load(sys.stdin); print(json.dumps({'Objects': objs, 'Quiet': True}))" > /tmp/delete-objects.json 2>/dev/null; \
+			aws s3api delete-objects \
+				--bucket "$$BUCKET_NAME" \
+				--delete file:///tmp/delete-objects.json \
+				--output json > /dev/null 2>&1 || true; \
+			rm -f /tmp/delete-objects.json; \
+		done; \
+		echo "Bucket emptied successfully"; \
+	else \
+		echo "Stack not found or bucket name not available"; \
+	fi
+
 .PHONY: delete
-delete:
+delete: empty-bucket
 	@echo "Deleting CloudFormation stack: $(STACK_NAME)"
 	@aws cloudformation delete-stack --stack-name $(STACK_NAME)
 	@echo "Waiting for stack deletion..."
@@ -55,7 +90,8 @@ validate:
 help:
 	@echo "Available targets:"
 	@echo "  deploy              - Deploy or update the CloudFormation stack"
-	@echo "  delete              - Delete the CloudFormation stack"
+	@echo "  empty-bucket        - Empty all objects from the S3 bucket"
+	@echo "  delete              - Empty bucket and delete the CloudFormation stack"
 	@echo "  status              - Show stack status"
 	@echo "  outputs             - Show stack outputs"
 	@echo "  bucket-name         - Show bucket name only"

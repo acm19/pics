@@ -22,6 +22,10 @@ clean:
 infra-deploy:
 	$(MAKE) -C infra deploy
 
+.PHONY: infra-empty-bucket
+infra-empty-bucket:
+	$(MAKE) -C infra empty-bucket
+
 .PHONY: infra-delete
 infra-delete:
 	$(MAKE) -C infra delete

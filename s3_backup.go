@@ -6,17 +6,20 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // S3Backup defines the interface for backing up directories to S3
@@ -162,7 +165,12 @@ func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		logger.Debug("Cleaning up temporary directory", "path", tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			logger.Error("Failed to remove temporary directory", "path", tmpDir, "error", err)
+		}
+	}()
 
 	archivePath := filepath.Join(tmpDir, filepath.Base(s3Key))
 	logger.Info("Creating archive", "directory", dirName, "images", imageCount, "videos", videoCount)
@@ -235,13 +243,28 @@ func isNotFoundError(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Check if error is NotFound type
-	if err.Error() == "NotFound" || err.Error() == "not found" {
+
+	// Check for NotFound type directly
+	var notFound *types.NotFound
+	if errors.As(err, &notFound) {
 		return true
 	}
-	// Use simple type assertion
-	_, ok := err.(*types.NotFound)
-	return ok
+
+	// Check for smithy API error with 404 status code
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		if apiErr.ErrorCode() == "NotFound" {
+			return true
+		}
+	}
+
+	// Check error message as fallback
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "NotFound") || strings.Contains(errMsg, "StatusCode: 404") {
+		return true
+	}
+
+	return false
 }
 
 // createTarGz creates a tar.gz archive of a directory

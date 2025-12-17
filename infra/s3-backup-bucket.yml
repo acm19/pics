@@ -18,7 +18,7 @@ Parameters:
   TransitionToGlacierDays:
     Type: Number
     Description: Number of days before transitioning objects to Glacier (0 to disable)
-    Default: 90
+    Default: 30
     MinValue: 0
 
 Conditions:
