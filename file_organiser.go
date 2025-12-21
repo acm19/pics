@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/barasher/go-exiftool"
 )
 
 var (
-	imageExtensions = []string{"*.jpg", "*.JPG", "*.jpeg", "*.JPEG"}
+	imageExtensions = []string{"*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.heic", "*.HEIC"}
 	videoExtensions = []string{"*.mov", "*.MOV"}
 )
 
@@ -17,8 +20,8 @@ var (
 type FileOrganiser interface {
 	// OrganiseByDate moves files to date-based directories
 	OrganiseByDate(sourceDir, targetDir string) error
-	// OrganiseVideosAndRenameJPGs organises videos into subdirectories and renames JPGs sequentially
-	OrganiseVideosAndRenameJPGs(targetDir string) error
+	// OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially
+	OrganiseVideosAndRenameImages(targetDir string) error
 	// RenameDirectory renames a date-based directory and all images inside it
 	RenameDirectory(directory, newName string) error
 }
@@ -29,6 +32,84 @@ type fileOrganiser struct{}
 // NewFileOrganiser creates a new FileOrganiser instance
 func NewFileOrganiser() FileOrganiser {
 	return &fileOrganiser{}
+}
+
+// getFileDate extracts the creation date from EXIF/metadata if available, otherwise falls back to file modification time
+// Works for both images (JPG, HEIC) and videos (MOV)
+func getFileDate(filePath string) (time.Time, error) {
+	// Try to extract EXIF date first
+	et, err := exiftool.NewExiftool()
+	if err != nil {
+		// If exiftool is not available, fall back to ModTime
+		logger.Debug("exiftool not available, using ModTime", "error", err)
+		info, statErr := os.Stat(filePath)
+		if statErr != nil {
+			return time.Time{}, statErr
+		}
+		return info.ModTime(), nil
+	}
+	defer et.Close()
+
+	fileInfos := et.ExtractMetadata(filePath)
+	if len(fileInfos) == 0 {
+		// No metadata found, fall back to ModTime
+		logger.Debug("No EXIF metadata found, using ModTime", "file", filePath)
+		info, statErr := os.Stat(filePath)
+		if statErr != nil {
+			return time.Time{}, statErr
+		}
+		return info.ModTime(), nil
+	}
+
+	fileInfo := fileInfos[0]
+	if fileInfo.Err != nil {
+		// Error reading EXIF, fall back to ModTime
+		logger.Debug("Error reading EXIF, using ModTime", "file", filePath, "error", fileInfo.Err)
+		info, statErr := os.Stat(filePath)
+		if statErr != nil {
+			return time.Time{}, statErr
+		}
+		return info.ModTime(), nil
+	}
+
+	// Try date fields in order of preference: CreationDate first, then CreateDate
+	var dateStr string
+	var found bool
+	var fieldName string
+
+	dateFields := []string{"CreationDate", "CreateDate"}
+	for _, field := range dateFields {
+		if val, err := fileInfo.GetString(field); err == nil {
+			dateStr = val
+			fieldName = field
+			found = true
+			logger.Debug("Using EXIF date field", "file", filepath.Base(filePath), "field", fieldName, "date", dateStr)
+			break
+		}
+	}
+
+	if !found {
+		// No EXIF date found, fall back to ModTime
+		logger.Debug("No EXIF date found, using ModTime", "file", filePath)
+		info, statErr := os.Stat(filePath)
+		if statErr != nil {
+			return time.Time{}, statErr
+		}
+		return info.ModTime(), nil
+	}
+
+	// Parse the EXIF date string (format: "2006:01:02 15:04:05")
+	parsedTime, err := time.Parse("2006:01:02 15:04:05", dateStr)
+	if err != nil {
+		logger.Debug("Failed to parse EXIF date, using ModTime", "file", filePath, "date", dateStr, "error", err)
+		info, statErr := os.Stat(filePath)
+		if statErr != nil {
+			return time.Time{}, statErr
+		}
+		return info.ModTime(), nil
+	}
+
+	return parsedTime, nil
 }
 
 // OrganiseByDate moves files to date-based directories
@@ -42,11 +123,14 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string) error {
 			continue
 		}
 		filePath := filepath.Join(sourceDir, entry.Name())
-		info, err := os.Stat(filePath)
+
+		// Get file date from EXIF if available, otherwise use ModTime
+		fileDate, err := getFileDate(filePath)
 		if err != nil {
 			return err
 		}
-		dirName := info.ModTime().Format("2006 01 January 02")
+
+		dirName := fileDate.Format("2006 01 January 02")
 		destDir := filepath.Join(targetDir, dirName)
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err
@@ -58,8 +142,8 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string) error {
 	return nil
 }
 
-// OrganiseVideosAndRenameJPGs organises videos into subdirectories and renames JPGs sequentially
-func (o *fileOrganiser) OrganiseVideosAndRenameJPGs(targetDir string) error {
+// OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially
+func (o *fileOrganiser) OrganiseVideosAndRenameImages(targetDir string) error {
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
 		return err
@@ -69,10 +153,11 @@ func (o *fileOrganiser) OrganiseVideosAndRenameJPGs(targetDir string) error {
 			continue
 		}
 		dirPath := filepath.Join(targetDir, entry.Name())
+		logger.Debug("Organising file %s/%s", dirPath, entry.Name())
 		if err := o.organiseVideos(dirPath, entry.Name()); err != nil {
 			return err
 		}
-		if err := o.renameJPGs(dirPath, entry.Name()); err != nil {
+		if err := o.renameImages(dirPath, entry.Name()); err != nil {
 			return err
 		}
 	}
@@ -112,8 +197,8 @@ func (o *fileOrganiser) organiseVideos(dir string, dirName string) error {
 	return nil
 }
 
-// renameJPGs renames JPG files with a sequential pattern
-func (o *fileOrganiser) renameJPGs(dir, dirName string) error {
+// renameImages renames image files with a sequential pattern
+func (o *fileOrganiser) renameImages(dir, dirName string) error {
 	imageFiles := []string{}
 	for _, pattern := range imageExtensions {
 		files, err := filepath.Glob(filepath.Join(dir, pattern))
@@ -132,7 +217,8 @@ func (o *fileOrganiser) renameJPGs(dir, dirName string) error {
 	}
 	picsName := strings.Join(parts, "_")
 	for i, file := range imageFiles {
-		newPath := filepath.Join(dir, fmt.Sprintf("%s_%05d.jpg", picsName, i+1))
+		ext := strings.ToLower(filepath.Ext(file))
+		newPath := filepath.Join(dir, fmt.Sprintf("%s_%05d%s", picsName, i+1, ext))
 		if err := os.Rename(file, newPath); err != nil {
 			return err
 		}
@@ -211,7 +297,8 @@ func (o *fileOrganiser) RenameDirectory(directory, newName string) error {
 		logger.Info("Renaming images", "count", len(imageFiles), "pattern", newBaseName)
 
 		for i, file := range imageFiles {
-			newFileName := fmt.Sprintf("%s_%05d.jpg", newBaseName, i+1)
+			ext := strings.ToLower(filepath.Ext(file))
+			newFileName := fmt.Sprintf("%s_%05d%s", newBaseName, i+1, ext)
 			newFilePath := filepath.Join(absDir, newFileName)
 
 			logger.Debug("Renaming image", "from", filepath.Base(file), "to", newFileName)

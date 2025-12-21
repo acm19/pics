@@ -95,9 +95,9 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 		return fmt.Errorf("failed to organise by date: %w", err)
 	}
 
-	logger.Info("Organising videos and renaming JPGs")
-	if err := p.organiser.OrganiseVideosAndRenameJPGs(targetDir); err != nil {
-		return fmt.Errorf("failed to organise videos and rename JPGs: %w", err)
+	logger.Info("Organising videos and renaming images")
+	if err := p.organiser.OrganiseVideosAndRenameImages(targetDir); err != nil {
+		return fmt.Errorf("failed to organise videos and rename images: %w", err)
 	}
 
 	logger.Info("Processing complete")
@@ -163,73 +163,114 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 	}
 }
 
-// discoverFiles walks directories and sends files to the jobs channel
+// discoverFiles walks directories recursively and sends files to the jobs channel
 func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) {
 	defer close(jobs)
+	logger.Info("Discovering files to process", "source", sourceDir)
 
-	entries, err := os.ReadDir(sourceDir)
-	if err != nil {
-		logger.Error("Failed to read source directory", "error", err)
-		return
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			logger.Debug("Error accessing path", "path", path, "error", err)
+			return err
 		}
-		prefix := entry.Name()
-		subDir := filepath.Join(sourceDir, entry.Name())
-		logger.Debug("Processing subdirectory", "dir", prefix)
 
-		filepath.Walk(subDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return err
-			}
-			ext := strings.ToUpper(filepath.Ext(path))
-			if ext == ".MOV" || ext == ".JPG" {
-				destPath := filepath.Join(tmpTarget, fmt.Sprintf("%s-%s", prefix, filepath.Base(path)))
-				jobs <- fileToProcess{
-					srcPath:  path,
-					destPath: destPath,
-					isJPEG:   ext == ".JPG",
-				}
+		// Skip dot files and dot directories
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
 			}
 			return nil
-		})
-	}
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		ext := strings.ToUpper(filepath.Ext(path))
+		if ext == ".MOV" || ext == ".JPG" || ext == ".JPEG" || ext == ".HEIC" {
+			// Calculate relative path from source directory for prefixing
+			relPath, err := filepath.Rel(sourceDir, path)
+			if err != nil {
+				logger.Debug("Failed to calculate relative path", "path", path, "error", err)
+				return err
+			}
+
+			// Use directory structure as prefix, replacing path separators with dashes
+			prefix := strings.ReplaceAll(filepath.Dir(relPath), string(filepath.Separator), "-")
+			if prefix == "." {
+				prefix = "root"
+			}
+
+			destPath := filepath.Join(tmpTarget, fmt.Sprintf("%s-%s", prefix, filepath.Base(path)))
+			logger.Debug("Discovered file", "path", path, "dest", destPath)
+
+			jobs <- fileToProcess{
+				srcPath:  path,
+				destPath: destPath,
+				isJPEG:   ext == ".JPG" || ext == ".JPEG",
+			}
+		}
+		return nil
+	})
 }
 
 // copyFilePreserveTime copies a file and preserves its modification time
 func copyFilePreserveTime(src, dst string) error {
+	logger.Debug("Starting file copy", "from", src, "to", dst)
+
 	srcInfo, err := os.Stat(src)
 	if err != nil {
+		logger.Debug("Failed to stat source file", "file", src, "error", err)
 		return err
 	}
+
 	srcFile, err := os.Open(src)
 	if err != nil {
+		logger.Debug("Failed to open source file", "file", src, "error", err)
 		return err
 	}
 	defer srcFile.Close()
 
 	dstFile, err := os.Create(dst)
 	if err != nil {
+		logger.Debug("Failed to create destination file", "file", dst, "error", err)
 		return err
 	}
 	defer dstFile.Close()
 
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
+	bytesWritten, err := io.Copy(dstFile, srcFile)
+	if err != nil {
+		logger.Debug("Failed to copy file contents", "from", src, "to", dst, "error", err)
 		return err
 	}
-	return os.Chtimes(dst, time.Now(), srcInfo.ModTime())
+
+	logger.Debug("File copied successfully", "from", src, "to", dst, "bytes", bytesWritten)
+
+	if err := os.Chtimes(dst, time.Now(), srcInfo.ModTime()); err != nil {
+		logger.Debug("Failed to preserve modification time", "file", dst, "error", err)
+		return err
+	}
+
+	logger.Debug("Modification time preserved", "file", dst, "modTime", srcInfo.ModTime())
+	return nil
 }
 
-// GetFileCount returns the number of files in a directory recursively
+// GetFileCount returns the number of files in a directory recursively (excluding dot files)
 func (p *mediaParser) GetFileCount(dir string) (int, error) {
 	count := 0
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
+		// Skip dot files and dot directories
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if !info.IsDir() {
 			count++
 		}

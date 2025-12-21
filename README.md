@@ -4,11 +4,11 @@ A Go application for organising and compressing photos and videos. Replicates th
 
 ## Features
 
-- Copies media files (JPG, MOV) from source subdirectories.
+- Copies media files (JPG, JPEG, HEIC, MOV) from source subdirectories.
 - Optional JPEG compression with configurable quality.
-- Organises files into date-based directories (YYYY MM Month DD).
+- Organises files into date-based directories (YYYY MM Month DD) using EXIF creation date when available.
 - Moves videos to separate subdirectories.
-- Renames JPEGs sequentially.
+- Renames images sequentially (preserves original file extensions).
 - Preserves file modification times.
 - Structured logging with debug mode.
 - Backup directories to S3 with deduplication (MD5 hash comparison).
@@ -17,8 +17,33 @@ A Go application for organising and compressing photos and videos. Replicates th
 ## Requirements
 
 - Go 1.21 or later.
+- `exiftool` - for reading EXIF metadata to organize files by photo creation date (optional, falls back to file modification time if not installed).
 - `jpegoptim` - for JPEG compression with EXIF preservation.
 - AWS credentials configured (for S3 backup feature) - via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or `~/.aws/credentials` file.
+
+### Installing ExifTool
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install libimage-exiftool-perl
+```
+
+**macOS:**
+```bash
+brew install exiftool
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install perl-Image-ExifTool
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S perl-image-exiftool
+```
+
+**Note:** If ExifTool is not installed, the application will automatically fall back to using file modification times for organizing photos.
 
 ### Installing jpegoptim
 
@@ -236,12 +261,12 @@ time=2025-12-15T10:30:05.000Z level=DEBUG msg="Compressing file" path=/target/tm
 ## How It Works
 
 1. **Validation**: Checks that source and target directories exist.
-2. **Copy**: Copies all JPG and MOV files from source subdirectories to a temporary directory, prefixing filenames with their subdirectory name.
+2. **Copy**: Copies all image files (JPG, JPEG, HEIC) and video files (MOV) from source subdirectories to a temporary directory, prefixing filenames with their subdirectory name.
 3. **Compress** (optional): Re-encodes JPEG files at the specified quality level.
-4. **Organise by Date**: Moves files into date-based directories based on file modification time.
+4. **Organise by Date**: Moves files into date-based directories based on EXIF creation date (falls back to file modification time if EXIF data is unavailable).
 5. **Final Organisation**:
    - Moves MOV files into `videos` subdirectories.
-   - Renames JPG files sequentially (e.g., `2025_12_December_15_00001.jpg`).
+   - Renames image files sequentially while preserving their original extensions (e.g., `2025_12_December_15_00001.jpg`, `2025_12_December_15_00002.heic`).
 6. **Cleanup**: Removes temporary directory.
 
 ## Configuration Options
