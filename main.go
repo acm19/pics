@@ -120,8 +120,8 @@ func runRename(cmd *cobra.Command, args []string) {
 	directory := args[0]
 	newName := args[1]
 
-	organiser := NewFileOrganiser()
-	if err := organiser.RenameDirectory(directory, newName); err != nil {
+	renamer := NewDirectoryRenamer()
+	if err := renamer.RenameDirectory(directory, newName); err != nil {
 		logger.Error("Rename failed", "error", err)
 		os.Exit(1)
 	}

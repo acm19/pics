@@ -1,5 +1,6 @@
 # Parse Pics
 
+[![Build Status](https://github.com/acm19/pic-store/actions/badge.svg)](https://github.com/acm19/pic-store/actions)
 [![codecov](https://codecov.io/github/acm19/pic-store/graph/badge.svg?token=NGC1P4AZLU)](https://codecov.io/github/acm19/pic-store)
 
 A Go application for organising and compressing photos and videos. Replicates the functionality of the original `parse-pics.sh` bash script with improved error handling and structured logging.
@@ -18,7 +19,7 @@ A Go application for organising and compressing photos and videos. Replicates th
 
 ## Requirements
 
-- Go 1.21 or later.
+- Go 1.24 or later.
 - `exiftool` - for reading EXIF metadata to organize files by photo creation date (optional, falls back to file modification time if not installed).
 - `jpegoptim` - for JPEG compression with EXIF preservation.
 - AWS credentials configured (for S3 backup feature) - via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or `~/.aws/credentials` file.
