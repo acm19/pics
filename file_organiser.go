@@ -19,8 +19,6 @@ type FileOrganiser interface {
 	OrganiseByDate(sourceDir, targetDir string) error
 	// OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially
 	OrganiseVideosAndRenameImages(targetDir string) error
-	// GetFileCount counts all non-directory files in a directory tree
-	GetFileCount(dir string) (int, error)
 }
 
 // fileOrganiser implements the FileOrganiser interface
@@ -147,28 +145,4 @@ func (o *fileOrganiser) renameImages(dir, dirName string) error {
 		}
 	}
 	return nil
-}
-
-// GetFileCount counts all non-directory files in a directory tree, excluding dot files
-func (o *fileOrganiser) GetFileCount(dir string) (int, error) {
-	count := 0
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip dot files and dot directories
-		if strings.HasPrefix(info.Name(), ".") {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !info.IsDir() {
-			count++
-		}
-		return nil
-	})
-	return count, err
 }

@@ -81,8 +81,8 @@ func runParse(cmd *cobra.Command, args []string) {
 	sourceDir := args[0]
 	targetDir := args[1]
 
-	parser := NewMediaParser()
-	if err := parser.ValidateDirectories(sourceDir, targetDir); err != nil {
+	fileStats := NewFileStats()
+	if err := fileStats.ValidateDirectories(sourceDir, targetDir); err != nil {
 		logger.Error("Directory validation failed", "error", err)
 		os.Exit(1)
 	}
@@ -90,20 +90,20 @@ func runParse(cmd *cobra.Command, args []string) {
 	opts := DefaultParseOptions()
 	opts.JPEGQuality = jpegQuality
 
-	organiser := NewFileOrganiser()
-	sourceCount, err := organiser.GetFileCount(sourceDir)
+	sourceCount, err := fileStats.GetFileCount(sourceDir)
 	if err != nil {
 		logger.Error("Error counting source files", "error", err)
 		os.Exit(1)
 	}
 
 	logger.Info("Starting media parsing", "source", sourceDir, "target", targetDir)
+	parser := NewMediaParser()
 	if err := parser.Parse(sourceDir, targetDir, opts); err != nil {
 		logger.Error("Parse failed", "error", err)
 		os.Exit(1)
 	}
 
-	targetCount, err := organiser.GetFileCount(targetDir)
+	targetCount, err := fileStats.GetFileCount(targetDir)
 	if err != nil {
 		logger.Error("Error counting target files", "error", err)
 		os.Exit(1)

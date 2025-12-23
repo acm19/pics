@@ -14,8 +14,6 @@ import (
 type MediaParser interface {
 	// Parse processes media files from source to target directory
 	Parse(sourceDir, targetDir string, opts ParseOptions) error
-	// ValidateDirectories checks if source and target directories exist
-	ValidateDirectories(sourceDir, targetDir string) error
 }
 
 // ParseOptions holds configuration options for parsing
@@ -54,22 +52,8 @@ func NewMediaParser() MediaParser {
 	}
 }
 
-// ValidateDirectories checks if source and target directories exist
-func (p *mediaParser) ValidateDirectories(sourceDir, targetDir string) error {
-	if info, err := os.Stat(sourceDir); err != nil || !info.IsDir() {
-		return fmt.Errorf("SOURCE_DIR is not a valid directory: %s", sourceDir)
-	}
-	if info, err := os.Stat(targetDir); err != nil || !info.IsDir() {
-		return fmt.Errorf("TARGET_DIR is not a valid directory: %s", targetDir)
-	}
-	return nil
-}
-
 // Parse processes media files from source to target directory
 func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) error {
-	if err := p.ValidateDirectories(sourceDir, targetDir); err != nil {
-		return err
-	}
 	sourceDir = strings.TrimSuffix(sourceDir, "/")
 	targetDir = strings.TrimSuffix(targetDir, "/")
 	tmpTarget := filepath.Join(targetDir, opts.TempDirName)
