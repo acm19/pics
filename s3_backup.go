@@ -40,7 +40,8 @@ type S3Backup interface {
 
 // s3Backup implements the S3Backup interface
 type s3Backup struct {
-	client *s3.Client
+	client     *s3.Client
+	extensions Extensions
 }
 
 // NewS3Backup creates a new S3Backup instance
@@ -50,7 +51,8 @@ func NewS3Backup(ctx context.Context) (S3Backup, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 	return &s3Backup{
-		client: s3.NewFromConfig(cfg),
+		client:     s3.NewFromConfig(cfg),
+		extensions: NewExtensions(),
 	}, nil
 }
 
@@ -134,23 +136,37 @@ func (b *s3Backup) backupWorker(workerID int, sourceDir, bucket string, jobs <-c
 // countMediaFiles counts images and videos in a directory
 func (b *s3Backup) countMediaFiles(dirPath string) (images int, videos int, err error) {
 	// Count images
-	for _, pattern := range imageExtensions {
-		files, err := filepath.Glob(filepath.Join(dirPath, pattern))
-		if err != nil {
-			return 0, 0, err
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
-		images += len(files)
+		filePath := filepath.Join(dirPath, entry.Name())
+		if b.extensions.IsImage(filePath) {
+			images++
+		}
 	}
 
 	// Count videos in videos subdirectory
 	videosDir := filepath.Join(dirPath, "videos")
 	if info, err := os.Stat(videosDir); err == nil && info.IsDir() {
-		for _, pattern := range videoExtensions {
-			files, err := filepath.Glob(filepath.Join(videosDir, pattern))
-			if err != nil {
-				return 0, 0, err
+		videoEntries, err := os.ReadDir(videosDir)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		for _, entry := range videoEntries {
+			if entry.IsDir() {
+				continue
 			}
-			videos += len(files)
+			filePath := filepath.Join(videosDir, entry.Name())
+			if b.extensions.IsVideo(filePath) {
+				videos++
+			}
 		}
 	}
 

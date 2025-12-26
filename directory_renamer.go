@@ -15,11 +15,15 @@ type DirectoryRenamer interface {
 }
 
 // directoryRenamer implements the DirectoryRenamer interface
-type directoryRenamer struct{}
+type directoryRenamer struct {
+	extensions Extensions
+}
 
 // NewDirectoryRenamer creates a new DirectoryRenamer instance
 func NewDirectoryRenamer() DirectoryRenamer {
-	return &directoryRenamer{}
+	return &directoryRenamer{
+		extensions: NewExtensions(),
+	}
 }
 
 // RenameDirectory renames a date-based directory and all images inside it
@@ -99,13 +103,20 @@ func (r *directoryRenamer) RenameDirectory(directory, newName string) error {
 
 // renameImages renames all image files in the directory
 func (r *directoryRenamer) renameImages(absDir, newBaseName string) error {
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
 	imageFiles := []string{}
-	for _, pattern := range imageExtensions {
-		files, err := filepath.Glob(filepath.Join(absDir, pattern))
-		if err != nil {
-			return fmt.Errorf("failed to find image files: %w", err)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
-		imageFiles = append(imageFiles, files...)
+		filePath := filepath.Join(absDir, entry.Name())
+		if r.extensions.IsImage(filePath) {
+			imageFiles = append(imageFiles, filePath)
+		}
 	}
 
 	if len(imageFiles) == 0 {
@@ -138,13 +149,20 @@ func (r *directoryRenamer) renameVideos(absDir, newBaseName string) error {
 		return nil
 	}
 
+	entries, err := os.ReadDir(videosDir)
+	if err != nil {
+		return fmt.Errorf("failed to read videos directory: %w", err)
+	}
+
 	videoFiles := []string{}
-	for _, pattern := range videoExtensions {
-		files, err := filepath.Glob(filepath.Join(videosDir, pattern))
-		if err != nil {
-			return fmt.Errorf("failed to find video files: %w", err)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
-		videoFiles = append(videoFiles, files...)
+		filePath := filepath.Join(videosDir, entry.Name())
+		if r.extensions.IsVideo(filePath) {
+			videoFiles = append(videoFiles, filePath)
+		}
 	}
 
 	if len(videoFiles) == 0 {

@@ -330,3 +330,35 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_PreservesExtensionCase(t *t
 	videosDir := filepath.Join(dateDir, "videos")
 	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.MOV"))
 }
+
+func TestFileOrganiser_OrganiseVideosAndRenameImages_MP4Videos(t *testing.T) {
+	tmpDir := t.TempDir()
+	_, targetDir := createDirs(t, tmpDir)
+	dateDir := createDateDir(t, targetDir, "2023 06 June 15")
+
+	// Create test images and MP4 videos
+	createFile(t, dateDir, "img1.jpg")
+	createFile(t, dateDir, "vid1.mp4")
+	createFile(t, dateDir, "vid2.MP4")
+
+	// Organise videos and rename images
+	organiser := NewFileOrganiser()
+	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	// Check image was renamed
+	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00001.jpg"))
+
+	// Check MP4 videos were moved to subdirectory and renamed (sorted: vid1.mp4, vid2.MP4)
+	videosDir := filepath.Join(dateDir, "videos")
+	assertFileExists(t, videosDir)
+	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.mp4"))
+	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.MP4"))
+
+	// Check videos were removed from root
+	assertFileNotExists(t, filepath.Join(dateDir, "vid1.mp4"))
+	assertFileNotExists(t, filepath.Join(dateDir, "vid2.MP4"))
+}

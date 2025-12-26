@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-var (
-	imageExtensions = []string{"*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.heic", "*.HEIC"}
-	videoExtensions = []string{"*.mov", "*.MOV"}
-)
-
 // FileOrganiser defines the interface for organising files
 type FileOrganiser interface {
 	// OrganiseByDate moves files to date-based directories
@@ -24,12 +19,14 @@ type FileOrganiser interface {
 // fileOrganiser implements the FileOrganiser interface
 type fileOrganiser struct {
 	dateExtractor *AggregatedFileDateExtractor
+	extensions    Extensions
 }
 
 // NewFileOrganiser creates a new FileOrganiser instance
 func NewFileOrganiser() FileOrganiser {
 	return &fileOrganiser{
 		dateExtractor: NewFileDateExtractor(),
+		extensions:    NewExtensions(),
 	}
 }
 
@@ -85,16 +82,24 @@ func (o *fileOrganiser) OrganiseVideosAndRenameImages(targetDir string) error {
 	return nil
 }
 
-// organiseVideos moves MOV files to a videos subdirectory and renames them sequentially
+// organiseVideos moves video files to a videos subdirectory and renames them sequentially
 func (o *fileOrganiser) organiseVideos(dir string, dirName string) error {
-	videoFiles := []string{}
-	for _, pattern := range videoExtensions {
-		files, err := filepath.Glob(filepath.Join(dir, pattern))
-		if err != nil {
-			return err
-		}
-		videoFiles = append(videoFiles, files...)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
 	}
+
+	videoFiles := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		filePath := filepath.Join(dir, entry.Name())
+		if o.extensions.IsVideo(filePath) {
+			videoFiles = append(videoFiles, filePath)
+		}
+	}
+
 	if len(videoFiles) == 0 {
 		return nil
 	}
@@ -120,14 +125,22 @@ func (o *fileOrganiser) organiseVideos(dir string, dirName string) error {
 
 // renameImages renames image files with a sequential pattern
 func (o *fileOrganiser) renameImages(dir, dirName string) error {
-	imageFiles := []string{}
-	for _, pattern := range imageExtensions {
-		files, err := filepath.Glob(filepath.Join(dir, pattern))
-		if err != nil {
-			return err
-		}
-		imageFiles = append(imageFiles, files...)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
 	}
+
+	imageFiles := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		filePath := filepath.Join(dir, entry.Name())
+		if o.extensions.IsImage(filePath) {
+			imageFiles = append(imageFiles, filePath)
+		}
+	}
+
 	if len(imageFiles) == 0 {
 		return nil
 	}

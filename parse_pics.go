@@ -42,6 +42,7 @@ func DefaultParseOptions() ParseOptions {
 type mediaParser struct {
 	compressor ImageCompressor
 	organiser  FileOrganiser
+	extensions Extensions
 }
 
 // NewMediaParser creates a new MediaParser instance
@@ -49,6 +50,7 @@ func NewMediaParser() MediaParser {
 	return &mediaParser{
 		compressor: NewImageCompressor(),
 		organiser:  NewFileOrganiser(),
+		extensions: NewExtensions(),
 	}
 }
 
@@ -168,8 +170,7 @@ func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fil
 			return nil
 		}
 
-		ext := strings.ToUpper(filepath.Ext(path))
-		if ext == ".MOV" || ext == ".JPG" || ext == ".JPEG" || ext == ".HEIC" {
+		if p.extensions.IsSupported(path) {
 			// Calculate relative path from source directory for prefixing
 			relPath, err := filepath.Rel(sourceDir, path)
 			if err != nil {
@@ -189,7 +190,7 @@ func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fil
 			jobs <- fileToProcess{
 				srcPath:  path,
 				destPath: destPath,
-				isJPEG:   ext == ".JPG" || ext == ".JPEG",
+				isJPEG:   p.extensions.IsJPEG(path),
 			}
 		}
 		return nil
