@@ -22,6 +22,11 @@ import (
 	"github.com/aws/smithy-go"
 )
 
+const (
+	tempDirPrefix        = "/tmp/pics_tmp_%d"
+	tempRestoreDirPrefix = "/tmp/pics_restore_%d"
+)
+
 // RestoreFilter defines the date range filter for restoring backups
 type RestoreFilter struct {
 	FromYear  int // 0 means no lower bound
@@ -56,6 +61,74 @@ func NewS3Backup(ctx context.Context) (S3Backup, error) {
 	}, nil
 }
 
+// Helper functions
+
+// createTempDir creates a temporary directory with cleanup
+func createTempDir(prefix string) (string, func(), error) {
+	tmpDir := fmt.Sprintf(prefix, rand.Int())
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	cleanup := func() {
+		logger.Debug("Cleaning up temporary directory", "path", tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			logger.Error("Failed to remove temporary directory", "path", tmpDir, "error", err)
+		}
+	}
+
+	return tmpDir, cleanup, nil
+}
+
+// runWorkerPool runs a worker pool and collects results
+func runWorkerPool[T any](jobs []T, maxConcurrent int, workerFunc func(T) error) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	jobsChan := make(chan T, len(jobs))
+	results := make(chan error, len(jobs))
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := range maxConcurrent {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for job := range jobsChan {
+				results <- workerFunc(job)
+			}
+		}(i)
+	}
+
+	// Send jobs
+	for _, job := range jobs {
+		jobsChan <- job
+	}
+	close(jobsChan)
+
+	// Wait for completion
+	wg.Wait()
+	close(results)
+
+	// Collect errors
+	var errors []error
+	successCount := 0
+	for err := range results {
+		if err != nil {
+			errors = append(errors, err)
+		} else {
+			successCount++
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("completed with %d successes and %d failures", successCount, len(errors))
+	}
+
+	return nil
+}
+
 // BackupDirectories backs up all subdirectories to S3 in parallel
 func (b *s3Backup) BackupDirectories(sourceDir, bucket string, maxConcurrent int) error {
 	// Find all subdirectories
@@ -78,59 +151,23 @@ func (b *s3Backup) BackupDirectories(sourceDir, bucket string, maxConcurrent int
 
 	logger.Info("Starting S3 backup", "directories", len(directories), "bucket", bucket, "concurrency", maxConcurrent)
 
-	// Create worker pool
-	jobs := make(chan string, len(directories))
-	results := make(chan error, len(directories))
-	var wg sync.WaitGroup
-
-	// Start workers
-	for i := range maxConcurrent {
-		wg.Add(1)
-		go b.backupWorker(i, sourceDir, bucket, jobs, results, &wg)
-	}
-
-	// Send jobs
-	for _, dirName := range directories {
-		jobs <- dirName
-	}
-	close(jobs)
-
-	// Wait for all workers to finish
-	wg.Wait()
-	close(results)
-
-	// Collect errors
-	var errors []error
-	successCount := 0
-	for err := range results {
-		if err != nil {
-			errors = append(errors, err)
-		} else {
-			successCount++
-		}
-	}
-
-	if len(errors) > 0 {
-		logger.Error("Backup completed with errors", "successful", successCount, "failed", len(errors))
-		return fmt.Errorf("backup failed for %d directories", len(errors))
-	}
-
-	logger.Info("Backup completed successfully", "directories_backed_up", successCount)
-	return nil
-}
-
-// backupWorker processes backup jobs from the jobs channel
-func (b *s3Backup) backupWorker(workerID int, sourceDir, bucket string, jobs <-chan string, results chan<- error, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for dirName := range jobs {
-		logger.Debug("Worker processing directory", "worker", workerID, "directory", dirName)
+	// Run worker pool
+	err = runWorkerPool(directories, maxConcurrent, func(dirName string) error {
+		logger.Debug("Processing directory", "directory", dirName)
 		if err := b.backupDirectory(sourceDir, dirName, bucket); err != nil {
 			logger.Error("Failed to backup directory", "directory", dirName, "error", err)
-			results <- fmt.Errorf("directory %s: %w", dirName, err)
-		} else {
-			results <- nil
+			return fmt.Errorf("directory %s: %w", dirName, err)
 		}
+		return nil
+	})
+
+	if err != nil {
+		logger.Error("Backup completed with errors", "error", err)
+		return err
 	}
+
+	logger.Info("Backup completed successfully", "directories_backed_up", len(directories))
+	return nil
 }
 
 // countMediaFiles counts images and videos in a directory
@@ -175,6 +212,7 @@ func (b *s3Backup) countMediaFiles(dirPath string) (images int, videos int, err 
 
 // backupDirectory backs up a single directory to S3
 func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
+	ctx := context.Background()
 	dirPath := filepath.Join(sourceDir, dirName)
 
 	// Count media files
@@ -186,17 +224,12 @@ func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
 	// Build S3 key with counts
 	s3Key := fmt.Sprintf("%s (%d images, %d videos).tar.gz", dirName, imageCount, videoCount)
 
-	// Create temporary tar.gz file
-	tmpDir := fmt.Sprintf("/tmp/pics_tmp_%d", rand.Int())
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+	// Create temporary directory
+	tmpDir, cleanup, err := createTempDir(tempDirPrefix)
+	if err != nil {
+		return err
 	}
-	defer func() {
-		logger.Debug("Cleaning up temporary directory", "path", tmpDir)
-		if err := os.RemoveAll(tmpDir); err != nil {
-			logger.Error("Failed to remove temporary directory", "path", tmpDir, "error", err)
-		}
-	}()
+	defer cleanup()
 
 	archivePath := filepath.Join(tmpDir, filepath.Base(s3Key))
 	logger.Info("Creating archive", "directory", dirName, "images", imageCount, "videos", videoCount)
@@ -212,7 +245,6 @@ func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
 	}
 
 	// Check if object already exists in S3 with same hash
-	ctx := context.Background()
 	headOutput, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(s3Key),
@@ -220,11 +252,9 @@ func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
 
 	if err == nil {
 		// Object exists, check if hash matches
-		remoteETag := ""
-		if headOutput.ETag != nil {
-			remoteETag = *headOutput.ETag
-			// Remove quotes from ETag
-			remoteETag = remoteETag[1 : len(remoteETag)-1]
+		remoteETag := b.extractETag(headOutput.ETag)
+		if remoteETag == "" {
+			return fmt.Errorf("S3 object exists but ETag is missing")
 		}
 
 		if remoteETag == localHash {
@@ -246,6 +276,19 @@ func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
 
 	logger.Info("Successfully backed up directory", "directory", dirName, "key", s3Key)
 	return nil
+}
+
+// extractETag safely extracts ETag value, removing quotes
+func (b *s3Backup) extractETag(etag *string) string {
+	if etag == nil || *etag == "" {
+		return ""
+	}
+	etagValue := *etag
+	// Remove quotes if present
+	if len(etagValue) >= 2 && etagValue[0] == '"' && etagValue[len(etagValue)-1] == '"' {
+		return etagValue[1 : len(etagValue)-1]
+	}
+	return etagValue
 }
 
 // calculateMD5 calculates the MD5 hash of a file
@@ -349,10 +392,13 @@ func (b *s3Backup) createTarGz(sourceDir, targetFile string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 
-		if _, err := io.Copy(tarWriter, f); err != nil {
-			return err
+		// Copy file content and close immediately (not defer in loop)
+		_, copyErr := io.Copy(tarWriter, f)
+		f.Close()
+
+		if copyErr != nil {
+			return copyErr
 		}
 
 		return nil
@@ -413,59 +459,23 @@ func (b *s3Backup) RestoreDirectories(bucket, targetDir string, filter RestoreFi
 
 	logger.Info("Starting restore", "objects", len(objectsToRestore), "target", targetDir, "concurrency", maxConcurrent)
 
-	// Create worker pool
-	jobs := make(chan types.Object, len(objectsToRestore))
-	results := make(chan error, len(objectsToRestore))
-	var wg sync.WaitGroup
-
-	// Start workers
-	for i := range maxConcurrent {
-		wg.Add(1)
-		go b.restoreWorker(i, bucket, targetDir, jobs, results, &wg)
-	}
-
-	// Send jobs
-	for _, obj := range objectsToRestore {
-		jobs <- obj
-	}
-	close(jobs)
-
-	// Wait for all workers to finish
-	wg.Wait()
-	close(results)
-
-	// Collect errors
-	var errors []error
-	successCount := 0
-	for err := range results {
-		if err != nil {
-			errors = append(errors, err)
-		} else {
-			successCount++
-		}
-	}
-
-	if len(errors) > 0 {
-		logger.Error("Restore completed with errors", "successful", successCount, "failed", len(errors))
-		return fmt.Errorf("restore failed for %d objects", len(errors))
-	}
-
-	logger.Info("Restore completed successfully", "directories_restored", successCount)
-	return nil
-}
-
-// restoreWorker processes restore jobs from the jobs channel
-func (b *s3Backup) restoreWorker(workerID int, bucket, targetDir string, jobs <-chan types.Object, results chan<- error, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for obj := range jobs {
-		logger.Debug("Worker processing object", "worker", workerID, "key", *obj.Key)
+	// Run worker pool
+	err := runWorkerPool(objectsToRestore, maxConcurrent, func(obj types.Object) error {
+		logger.Debug("Processing object", "key", *obj.Key)
 		if err := b.restoreObject(bucket, targetDir, *obj.Key); err != nil {
 			logger.Error("Failed to restore object", "key", *obj.Key, "error", err)
-			results <- fmt.Errorf("object %s: %w", *obj.Key, err)
-		} else {
-			results <- nil
+			return fmt.Errorf("object %s: %w", *obj.Key, err)
 		}
+		return nil
+	})
+
+	if err != nil {
+		logger.Error("Restore completed with errors", "error", err)
+		return err
 	}
+
+	logger.Info("Restore completed successfully", "directories_restored", len(objectsToRestore))
+	return nil
 }
 
 // restoreObject downloads and extracts a single object from S3
@@ -482,16 +492,11 @@ func (b *s3Backup) restoreObject(bucket, targetDir, key string) error {
 	}
 
 	// Create temporary directory for download
-	tmpDir := fmt.Sprintf("/tmp/pics_restore_%d", rand.Int())
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+	tmpDir, cleanup, err := createTempDir(tempRestoreDirPrefix)
+	if err != nil {
+		return err
 	}
-	defer func() {
-		logger.Debug("Cleaning up temporary directory", "path", tmpDir)
-		if err := os.RemoveAll(tmpDir); err != nil {
-			logger.Error("Failed to remove temporary directory", "path", tmpDir, "error", err)
-		}
-	}()
+	defer cleanup()
 
 	// Download from S3
 	archivePath := filepath.Join(tmpDir, filepath.Base(key))
@@ -515,7 +520,6 @@ func (b *s3Backup) restoreObject(bucket, targetDir, key string) error {
 	if _, err := io.Copy(file, result.Body); err != nil {
 		return fmt.Errorf("failed to write archive: %w", err)
 	}
-	file.Close()
 
 	// Extract tar.gz
 	logger.Info("Extracting archive", "archive", archivePath, "target", targetDir)
