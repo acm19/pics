@@ -35,6 +35,15 @@ type RestoreFilter struct {
 	ToMonth   int // 0 means December if ToYear is set
 }
 
+// S3ClientInterface defines the S3 operations we use
+// The real *s3.Client naturally satisfies this interface (duck typing)
+type S3ClientInterface interface {
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+}
+
 // Backup defines the interface for backing up and restoring directories
 type Backup interface {
 	// BackupDirectories backs up all subdirectories in the source directory
@@ -45,7 +54,7 @@ type Backup interface {
 
 // s3Backup implements the Backup interface for AWS S3
 type s3Backup struct {
-	client     *s3.Client
+	client     S3ClientInterface
 	extensions Extensions
 }
 
