@@ -152,7 +152,7 @@ func runBackup(cmd *cobra.Command, args []string) {
 	}
 
 	logger.Info("Starting backup", "source", sourceDir, "bucket", bucket, "max_concurrent", maxConcurrent)
-	if err := backup.BackupDirectories(sourceDir, bucket, maxConcurrent); err != nil {
+	if err := backup.BackupDirectories(ctx, sourceDir, bucket, maxConcurrent); err != nil {
 		logger.Error("Backup failed", "error", err)
 		os.Exit(1)
 	}
@@ -205,7 +205,7 @@ func runRestore(cmd *cobra.Command, args []string) {
 	}
 
 	logger.Info("Starting restore", "bucket", bucket, "target", targetDir, "max_concurrent", maxConcurrent, "filter", filter)
-	if err := backup.RestoreDirectories(bucket, targetDir, filter, maxConcurrent); err != nil {
+	if err := backup.RestoreDirectories(ctx, bucket, targetDir, filter, maxConcurrent); err != nil {
 		logger.Error("Restore failed", "error", err)
 		os.Exit(1)
 	}

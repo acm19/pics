@@ -46,9 +46,9 @@ type S3ClientInterface interface {
 // Backup defines the interface for backing up and restoring directories
 type Backup interface {
 	// BackupDirectories backs up all subdirectories in the source directory
-	BackupDirectories(sourceDir, bucket string, maxConcurrent int) error
+	BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int) error
 	// RestoreDirectories restores directories to target directory
-	RestoreDirectories(bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error
+	RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error
 }
 
 // s3Backup implements the Backup interface for AWS S3
@@ -138,7 +138,7 @@ func runWorkerPool[T any](jobs []T, maxConcurrent int, workerFunc func(T) error)
 }
 
 // BackupDirectories backs up all subdirectories to S3 in parallel
-func (b *s3Backup) BackupDirectories(sourceDir, bucket string, maxConcurrent int) error {
+func (b *s3Backup) BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int) error {
 	// Find all subdirectories
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
@@ -162,7 +162,7 @@ func (b *s3Backup) BackupDirectories(sourceDir, bucket string, maxConcurrent int
 	// Run worker pool
 	err = runWorkerPool(directories, maxConcurrent, func(dirName string) error {
 		logger.Debug("Processing directory", "directory", dirName)
-		if err := b.backupDirectory(sourceDir, dirName, bucket); err != nil {
+		if err := b.backupDirectory(ctx, sourceDir, dirName, bucket); err != nil {
 			logger.Error("Failed to backup directory", "directory", dirName, "error", err)
 			return fmt.Errorf("directory %s: %w", dirName, err)
 		}
@@ -219,8 +219,7 @@ func (b *s3Backup) countMediaFiles(dirPath string) (images int, videos int, err 
 }
 
 // backupDirectory backs up a single directory to S3
-func (b *s3Backup) backupDirectory(sourceDir, dirName, bucket string) error {
-	ctx := context.Background()
+func (b *s3Backup) backupDirectory(ctx context.Context, sourceDir, dirName, bucket string) error {
 	dirPath := filepath.Join(sourceDir, dirName)
 
 	// Count media files
@@ -431,9 +430,7 @@ func (b *s3Backup) uploadToS3(ctx context.Context, filePath, bucket, key string)
 }
 
 // RestoreDirectories restores directories from S3 to target directory
-func (b *s3Backup) RestoreDirectories(bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error {
-	ctx := context.Background()
-
+func (b *s3Backup) RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error {
 	// List all objects in bucket
 	logger.Info("Listing objects in S3 bucket", "bucket", bucket)
 	var allObjects []types.Object
@@ -470,7 +467,7 @@ func (b *s3Backup) RestoreDirectories(bucket, targetDir string, filter RestoreFi
 	// Run worker pool
 	err := runWorkerPool(objectsToRestore, maxConcurrent, func(obj types.Object) error {
 		logger.Debug("Processing object", "key", *obj.Key)
-		if err := b.restoreObject(bucket, targetDir, *obj.Key); err != nil {
+		if err := b.restoreObject(ctx, bucket, targetDir, *obj.Key); err != nil {
 			logger.Error("Failed to restore object", "key", *obj.Key, "error", err)
 			return fmt.Errorf("object %s: %w", *obj.Key, err)
 		}
@@ -487,9 +484,7 @@ func (b *s3Backup) RestoreDirectories(bucket, targetDir string, filter RestoreFi
 }
 
 // restoreObject downloads and extracts a single object from S3
-func (b *s3Backup) restoreObject(bucket, targetDir, key string) error {
-	ctx := context.Background()
-
+func (b *s3Backup) restoreObject(ctx context.Context, bucket, targetDir, key string) error {
 	// Extract directory name from key (remove " (X images, Y videos).tar.gz" suffix)
 	dirName := b.extractDirNameFromKey(key)
 	if dirName == "" {

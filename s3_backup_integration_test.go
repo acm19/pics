@@ -16,6 +16,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// testCtx is a shared context for all integration tests
+var testCtx = context.Background()
+
 // InMemoryS3Client is an in-memory S3 implementation for integration testing
 type InMemoryS3Client struct {
 	mu      sync.RWMutex
@@ -255,7 +258,7 @@ func TestBackup_BackupDirectories(t *testing.T) {
 
 	// Backup all directories
 	bucket := "test-bucket"
-	err := backup.BackupDirectories(sourceDir, bucket, 2)
+	err := backup.BackupDirectories(testCtx, sourceDir, bucket, 2)
 
 	if err != nil {
 		t.Fatalf("BackupDirectories failed: %v", err)
@@ -307,12 +310,12 @@ func TestBackup_RestoreDirectories(t *testing.T) {
 	createTempTestFile(t, dir1, "photo2.heic")
 
 	// Backup the directory
-	if err := backup.BackupDirectories(sourceDir, bucket, 1); err != nil {
+	if err := backup.BackupDirectories(testCtx, sourceDir, bucket, 1); err != nil {
 		t.Fatalf("BackupDirectories failed: %v", err)
 	}
 
 	// Restore directories
-	err := backup.RestoreDirectories(bucket, targetDir, RestoreFilter{}, 1)
+	err := backup.RestoreDirectories(testCtx, bucket, targetDir, RestoreFilter{}, 1)
 
 	if err != nil {
 		t.Fatalf("RestoreDirectories failed: %v", err)
@@ -364,7 +367,7 @@ func TestBackup_RestoreDirectories_WithFilter(t *testing.T) {
 	}
 
 	// Backup all directories
-	if err := backup.BackupDirectories(sourceDir, bucket, 2); err != nil {
+	if err := backup.BackupDirectories(testCtx, sourceDir, bucket, 2); err != nil {
 		t.Fatalf("BackupDirectories failed: %v", err)
 	}
 
@@ -373,7 +376,7 @@ func TestBackup_RestoreDirectories_WithFilter(t *testing.T) {
 		FromYear: 2023,
 		ToYear:   2023,
 	}
-	err := backup.RestoreDirectories(bucket, targetDir, filter, 1)
+	err := backup.RestoreDirectories(testCtx, bucket, targetDir, filter, 1)
 
 	if err != nil {
 		t.Fatalf("RestoreDirectories failed: %v", err)
@@ -426,7 +429,7 @@ func TestBackup_RoundTrip(t *testing.T) {
 	createTempTestFile(t, videosDir, "video1.mov")
 
 	// Backup
-	if err := backup.BackupDirectories(sourceDir, bucket, 1); err != nil {
+	if err := backup.BackupDirectories(testCtx, sourceDir, bucket, 1); err != nil {
 		t.Fatalf("BackupDirectories failed: %v", err)
 	}
 
@@ -436,7 +439,7 @@ func TestBackup_RoundTrip(t *testing.T) {
 	}
 
 	// Restore
-	if err := backup.RestoreDirectories(bucket, targetDir, RestoreFilter{}, 1); err != nil {
+	if err := backup.RestoreDirectories(testCtx, bucket, targetDir, RestoreFilter{}, 1); err != nil {
 		t.Fatalf("RestoreDirectories failed: %v", err)
 	}
 
@@ -476,12 +479,12 @@ func TestBackup_Deduplication(t *testing.T) {
 	createTempTestFile(t, testDir, "photo1.jpg")
 
 	// First backup
-	if err := backup.BackupDirectories(sourceDir, bucket, 1); err != nil {
+	if err := backup.BackupDirectories(testCtx, sourceDir, bucket, 1); err != nil {
 		t.Fatalf("First backup failed: %v", err)
 	}
 
 	// Second backup (should skip due to matching hash)
-	if err := backup.BackupDirectories(sourceDir, bucket, 1); err != nil {
+	if err := backup.BackupDirectories(testCtx, sourceDir, bucket, 1); err != nil {
 		t.Fatalf("Second backup failed: %v", err)
 	}
 
