@@ -90,15 +90,13 @@ type AggregatedFileDateExtractor struct {
 
 // NewFileDateExtractor creates a new AggregatedFileDateExtractor with EXIF and ModTime extractors
 //
-// Prioritise EXIF metadata for date extraction
-//
 // Prioritises extracting the dates from the EXIF metadata in the following
 // order:
 //
-// - CreationDate: because modified iPhone videos keep the original date in
-//   this field.
-// - CreateDate: holds the date when the image/video was created.
-// - ModTime: if nothing else works falls back to modification time.
+//   - CreationDate: because modified iPhone videos keep the original date in
+//     this field.
+//   - CreateDate: holds the date when the image/video was created.
+//   - ModTime: if nothing else works falls back to modification time.
 func NewFileDateExtractor() *AggregatedFileDateExtractor {
 	return &AggregatedFileDateExtractor{
 		extractors: []fileDateExtractor{

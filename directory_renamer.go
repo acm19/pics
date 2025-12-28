@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -17,13 +16,15 @@ type DirectoryRenamer interface {
 
 // directoryRenamer implements the DirectoryRenamer interface
 type directoryRenamer struct {
-	extensions Extensions
+	extensions  Extensions
+	fileRenamer FileRenamer
 }
 
 // NewDirectoryRenamer creates a new DirectoryRenamer instance
 func NewDirectoryRenamer() DirectoryRenamer {
 	return &directoryRenamer{
-		extensions: NewExtensions(),
+		extensions:  NewExtensions(),
+		fileRenamer: NewFileRenamer(),
 	}
 }
 
@@ -114,39 +115,13 @@ func (r *directoryRenamer) RenameDirectory(directory, newName string) error {
 
 // renameImages renames all image files in the directory
 func (r *directoryRenamer) renameImages(absDir, newBaseName string) error {
-	entries, err := os.ReadDir(absDir)
+	imageCount, err := r.fileRenamer.RenameFilesWithPattern(absDir, newBaseName, r.extensions.IsImage)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
+		return err
 	}
 
-	imageFiles := []string{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		filePath := filepath.Join(absDir, entry.Name())
-		if r.extensions.IsImage(filePath) {
-			imageFiles = append(imageFiles, filePath)
-		}
-	}
-
-	if len(imageFiles) == 0 {
-		return nil
-	}
-
-	sort.Strings(imageFiles)
-	logger.Info("Renaming images", "count", len(imageFiles), "pattern", newBaseName)
-
-	for i, file := range imageFiles {
-		ext := strings.ToLower(filepath.Ext(file))
-		newFileName := fmt.Sprintf("%s_%05d%s", newBaseName, i+1, ext)
-		newFilePath := filepath.Join(absDir, newFileName)
-
-		logger.Debug("Renaming image", "from", filepath.Base(file), "to", newFileName)
-
-		if err := os.Rename(file, newFilePath); err != nil {
-			return fmt.Errorf("failed to rename %s: %w", file, err)
-		}
+	if imageCount > 0 {
+		logger.Info("Renaming images", "count", imageCount, "pattern", newBaseName)
 	}
 
 	return nil
@@ -160,38 +135,13 @@ func (r *directoryRenamer) renameVideos(absDir, newBaseName string) error {
 		return nil
 	}
 
-	entries, err := os.ReadDir(videosDir)
+	videoCount, err := r.fileRenamer.MoveAndRenameFilesWithPattern(videosDir, videosDir, newBaseName, r.extensions.IsVideo)
 	if err != nil {
-		return fmt.Errorf("failed to read videos directory: %w", err)
+		return err
 	}
 
-	videoFiles := []string{}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		filePath := filepath.Join(videosDir, entry.Name())
-		if r.extensions.IsVideo(filePath) {
-			videoFiles = append(videoFiles, filePath)
-		}
-	}
-
-	if len(videoFiles) == 0 {
-		return nil
-	}
-
-	sort.Strings(videoFiles)
-	logger.Info("Renaming videos", "count", len(videoFiles), "pattern", newBaseName)
-
-	for i, file := range videoFiles {
-		ext := filepath.Ext(file)
-		newFileName := fmt.Sprintf("%s_%05d%s", newBaseName, i+1, ext)
-		newFilePath := filepath.Join(videosDir, newFileName)
-		logger.Debug("Renaming video", "from", filepath.Base(file), "to", newFileName)
-
-		if err := os.Rename(file, newFilePath); err != nil {
-			return fmt.Errorf("failed to rename %s: %w", file, err)
-		}
+	if videoCount > 0 {
+		logger.Info("Renaming videos", "count", videoCount, "pattern", newBaseName)
 	}
 
 	return nil

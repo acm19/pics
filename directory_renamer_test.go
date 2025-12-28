@@ -114,11 +114,11 @@ func TestDirectoryRenamer_RenameDirectory_WithVideos(t *testing.T) {
 	newDirPath := filepath.Join(tmpDir, "2023 06 June 15 trip")
 	assertDirExists(t, newDirPath)
 
-	// Check that videos were renamed
+	// Check that videos were renamed with lowercase extensions
 	newVideosDir := filepath.Join(newDirPath, "videos")
 	expectedFiles := []string{
 		"2023_06_June_15_trip_00001.mov",
-		"2023_06_June_15_trip_00002.MOV",
+		"2023_06_June_15_trip_00002.mov",
 	}
 	assertFilesExist(t, newVideosDir, expectedFiles)
 }

@@ -337,11 +337,11 @@ func TestMediaParser_Parse_MP4Videos(t *testing.T) {
 	expectedDir := filepath.Join(targetDir, "2023 06 June 15")
 	assertMediaFileExists(t, filepath.Join(expectedDir, "2023_06_June_15_00001.jpg"))
 
-	// Check MP4 videos were moved to subdirectory and renamed (sorted: root-video1.mp4, root-video2.MP4)
+	// Check MP4 videos were moved to subdirectory and renamed with lowercase extensions
 	videosDir := filepath.Join(expectedDir, "videos")
 	assertMediaFileExists(t, videosDir)
 	assertMediaFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.mp4"))
-	assertMediaFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.MP4"))
+	assertMediaFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.mp4"))
 }
 
 func TestCopyFilePreserveTime(t *testing.T) {

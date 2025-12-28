@@ -1,8 +1,8 @@
 package main
 
 import (
-	"slices"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 

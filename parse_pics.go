@@ -79,6 +79,12 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 		return fmt.Errorf("failed to organise by date: %w", err)
 	}
 
+	// Remove temporary directory before organising (all files have been moved to date-based directories)
+	logger.Debug("Removing temporary directory", "path", tmpTarget)
+	if err := os.RemoveAll(tmpTarget); err != nil {
+		return fmt.Errorf("failed to remove temp directory: %w", err)
+	}
+
 	logger.Info("Organising videos and renaming images")
 	if err := p.organiser.OrganiseVideosAndRenameImages(targetDir); err != nil {
 		return fmt.Errorf("failed to organise videos and rename images: %w", err)

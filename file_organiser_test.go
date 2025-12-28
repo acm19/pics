@@ -177,11 +177,11 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages(t *testing.T) {
 	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00001.jpg"))
 	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00002.heic"))
 
-	// Check videos were moved to subdirectory and renamed
+	// Check videos were moved to subdirectory and renamed with lowercase extensions
 	videosDir := filepath.Join(dateDir, "videos")
 	assertFileExists(t, videosDir)
 	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.mov"))
-	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.MOV"))
+	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.mov"))
 
 	// Check videos were removed from root
 	assertFileNotExists(t, filepath.Join(dateDir, "vid1.mov"))
@@ -303,7 +303,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_NonexistentTarget(t *testin
 	}
 }
 
-func TestFileOrganiser_OrganiseVideosAndRenameImages_PreservesExtensionCase(t *testing.T) {
+func TestFileOrganiser_OrganiseVideosAndRenameImages_NormalisesExtensions(t *testing.T) {
 	tmpDir := t.TempDir()
 	_, targetDir := createDirs(t, tmpDir)
 	dateDir := createDateDir(t, targetDir, "2023 06 June 15")
@@ -326,9 +326,9 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_PreservesExtensionCase(t *t
 	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00001.jpg"))
 	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00002.heic"))
 
-	// Check video preserves original extension case
+	// Check video also has lowercase extension
 	videosDir := filepath.Join(dateDir, "videos")
-	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.MOV"))
+	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.mov"))
 }
 
 func TestFileOrganiser_OrganiseVideosAndRenameImages_MP4Videos(t *testing.T) {
@@ -352,11 +352,11 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_MP4Videos(t *testing.T) {
 	// Check image was renamed
 	assertFileExists(t, filepath.Join(dateDir, "2023_06_June_15_00001.jpg"))
 
-	// Check MP4 videos were moved to subdirectory and renamed (sorted: vid1.mp4, vid2.MP4)
+	// Check MP4 videos were moved to subdirectory and renamed with lowercase extensions
 	videosDir := filepath.Join(dateDir, "videos")
 	assertFileExists(t, videosDir)
 	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00001.mp4"))
-	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.MP4"))
+	assertFileExists(t, filepath.Join(videosDir, "2023_06_June_15_00002.mp4"))
 
 	// Check videos were removed from root
 	assertFileNotExists(t, filepath.Join(dateDir, "vid1.mp4"))
