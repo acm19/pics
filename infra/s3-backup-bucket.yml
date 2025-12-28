@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 bucket for parse-pics backup storage
+Description: S3 bucket for pics backup storage
 
 Parameters:
   BucketName:
@@ -51,7 +51,7 @@ Resources:
                 StorageClass: GLACIER
       Tags:
         - Key: Purpose
-          Value: parse-pics-backup
+          Value: pics-backup
         - Key: ManagedBy
           Value: CloudFormation
 

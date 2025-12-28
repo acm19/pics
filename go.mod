@@ -1,4 +1,4 @@
-module github.com/acm19/pic-store
+module github.com/acm19/pics
 
 go 1.24.4
 

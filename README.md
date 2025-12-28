@@ -1,7 +1,7 @@
-# Parse Pics
+# Pics
 
-[![Tests](https://github.com/acm19/pic-store/actions/workflows/test.yml/badge.svg)](https://github.com/acm19/pic-store/actions/workflows/test.yml)
-[![codecov](https://codecov.io/github/acm19/pic-store/graph/badge.svg?token=NGC1P4AZLU)](https://codecov.io/github/acm19/pic-store)
+[![Tests](https://github.com/acm19/pics/actions/workflows/test.yml/badge.svg)](https://github.com/acm19/pics/actions/workflows/test.yml)
+[![codecov](https://codecov.io/github/acm19/pics/graph/badge.svg?token=NGC1P4AZLU)](https://codecov.io/github/acm19/pics)
 
 A Go application for organising and compressing photos and videos. Replicates the functionality of the original `parse-pics.sh` bash script with improved error handling and structured logging.
 
@@ -76,7 +76,7 @@ sudo pacman -S jpegoptim
 make build
 ```
 
-This creates a `parse-pics` binary in the current directory.
+This creates a `pics` binary in the current directory.
 
 ## Usage
 
@@ -84,11 +84,11 @@ This creates a `parse-pics` binary in the current directory.
 
 ```bash
 # Basic usage with default settings (quality 50)
-./parse-pics parse SOURCE_DIR TARGET_DIR
+./pics parse SOURCE_DIR TARGET_DIR
 
 # Custom compression quality
-./parse-pics parse SOURCE_DIR TARGET_DIR --rate 75
-./parse-pics parse SOURCE_DIR TARGET_DIR -r 75
+./pics parse SOURCE_DIR TARGET_DIR --rate 75
+./pics parse SOURCE_DIR TARGET_DIR -r 75
 
 # Using make
 make run ARGS="parse /path/to/source /path/to/target --rate 75"
@@ -104,7 +104,7 @@ make run ARGS="parse /path/to/source /path/to/target --rate 75"
 ### Rename a date-based directory
 
 ```bash
-./parse-pics rename DIRECTORY NAME
+./pics rename DIRECTORY NAME
 
 # Using make
 make run ARGS="rename '/path/to/2025 12 December 15' Vacation"
@@ -117,12 +117,12 @@ make run ARGS="rename '/path/to/2025 12 December 15' Vacation"
 **Examples:**
 ```bash
 # Add name to unnamed directory
-./parse-pics rename "/pics/2025 12 December 15" "Vacation"
+./pics rename "/pics/2025 12 December 15" "Vacation"
 # Result: /pics/2025 12 December 15 Vacation/
 #         Images: 2025_12_December_15_Vacation_00001.jpg
 
 # Replace existing name
-./parse-pics rename "/pics/2025 12 December 15 OldName" "NewName"
+./pics rename "/pics/2025 12 December 15 OldName" "NewName"
 # Result: /pics/2025 12 December 15 NewName/
 #         Images: 2025_12_December_15_NewName_00001.jpg
 ```
@@ -131,11 +131,11 @@ make run ARGS="rename '/path/to/2025 12 December 15' Vacation"
 
 ```bash
 # Basic backup with default concurrency (5)
-./parse-pics backup SOURCE_DIR BUCKET
+./pics backup SOURCE_DIR BUCKET
 
 # Custom concurrency level
-./parse-pics backup SOURCE_DIR BUCKET --max-concurrent 3
-./parse-pics backup SOURCE_DIR BUCKET -c 3
+./pics backup SOURCE_DIR BUCKET --max-concurrent 3
+./pics backup SOURCE_DIR BUCKET -c 3
 
 # Using make
 make run ARGS="backup /path/to/organised/pics my-backup-bucket --max-concurrent 3"
@@ -167,22 +167,22 @@ Archives are named with image and video counts:
 
 ```bash
 # Restore all backups
-./parse-pics restore BUCKET TARGET_DIR
+./pics restore BUCKET TARGET_DIR
 
 # Restore only 2025 backups
-./parse-pics restore BUCKET TARGET_DIR --from 2025 --to 2025
+./pics restore BUCKET TARGET_DIR --from 2025 --to 2025
 
 # Restore from August 2024 onwards
-./parse-pics restore BUCKET TARGET_DIR --from 08/2024
+./pics restore BUCKET TARGET_DIR --from 08/2024
 
 # Restore up to June 2025
-./parse-pics restore BUCKET TARGET_DIR --to 06/2025
+./pics restore BUCKET TARGET_DIR --to 06/2025
 
 # Restore specific range: August 2024 to March 2025
-./parse-pics restore BUCKET TARGET_DIR --from 08/2024 --to 03/2025
+./pics restore BUCKET TARGET_DIR --from 08/2024 --to 03/2025
 
 # Custom concurrency
-./parse-pics restore BUCKET TARGET_DIR --max-concurrent 3 -c 3
+./pics restore BUCKET TARGET_DIR --max-concurrent 3 -c 3
 
 # Using make
 make run ARGS="restore my-backup-bucket /path/to/restore --from 2024 --to 2025"
@@ -212,13 +212,13 @@ make run ARGS="restore my-backup-bucket /path/to/restore --from 2024 --to 2025"
 **Examples:**
 ```bash
 # Enable debug logging
-DEBUG=1 ./parse-pics parse /source /target
+DEBUG=1 ./pics parse /source /target
 
 # Debug with backup
-DEBUG=1 ./parse-pics backup /pics/organised my-backup-bucket
+DEBUG=1 ./pics backup /pics/organised my-backup-bucket
 
 # Debug with restore
-DEBUG=1 ./parse-pics restore my-backup-bucket /restore --from 2025
+DEBUG=1 ./pics restore my-backup-bucket /restore --from 2025
 ```
 
 ## Logging
@@ -251,7 +251,7 @@ Shows detailed operations including individual files:
 
 ```bash
 # Enable with DEBUG environment variable
-DEBUG=1 ./parse-pics parse /source /target
+DEBUG=1 ./pics parse /source /target
 ```
 
 ```

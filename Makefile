@@ -1,4 +1,4 @@
-BINARY_NAME=parse-pics
+BINARY_NAME=pics
 
 .PHONY: build
 build:

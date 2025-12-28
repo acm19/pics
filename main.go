@@ -11,9 +11,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "parse-pics",
+	Use:   "pics",
 	Short: "A Go application for organising and compressing photos and videos",
-	Long:  `Parse Pics helps you organize media files, compress images, and backup/restore to S3.`,
+	Long:  `Pics helps you organize media files, compress images, and backup/restore to S3.`,
 }
 
 var parseCmd = &cobra.Command{

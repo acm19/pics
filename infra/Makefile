@@ -98,7 +98,7 @@ help:
 	@echo "  validate            - Validate the CloudFormation template"
 	@echo ""
 	@echo "Variables:"
-	@echo "  STACK_NAME          - CloudFormation stack name (default: parse-pics-backup)"
+	@echo "  STACK_NAME          - CloudFormation stack name (default: pics-backup)"
 	@echo "  BUCKET_NAME         - S3 bucket name (default: auto-generated)"
 	@echo "  ENABLE_VERSIONING   - Enable versioning (default: false)"
 	@echo "  GLACIER_TRANSITION_DAYS - Days before Glacier transition (default: 90)"
