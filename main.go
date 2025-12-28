@@ -10,10 +10,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at build time via -ldflags
+var version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "pics",
-	Short: "A Go application for organising and compressing photos and videos",
-	Long:  `Pics helps you organize media files, compress images, and backup/restore to S3.`,
+	Use:     "pics",
+	Short:   "A Go application for organising and compressing photos and videos",
+	Long:    `Pics helps you organise media files, compress images, and backup/restore to S3.`,
+	Version: version,
 }
 
 var parseCmd = &cobra.Command{

@@ -1,9 +1,12 @@
 # Pics
 
 [![Tests](https://github.com/acm19/pics/actions/workflows/test.yml/badge.svg)](https://github.com/acm19/pics/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/acm19/pics)](https://github.com/acm19/pics/releases)
 [![codecov](https://codecov.io/github/acm19/pics/graph/badge.svg?token=NGC1P4AZLU)](https://codecov.io/github/acm19/pics)
 
 A Go application for organising and compressing photos and videos. Replicates the functionality of the original `parse-pics.sh` bash script with improved error handling and structured logging.
+
+For maintainers: see [RELEASING.md](RELEASING.md) for the release process.
 
 ## Features
 

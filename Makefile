@@ -1,4 +1,5 @@
 BINARY_NAME=pics
+GORELEASER := go run github.com/goreleaser/goreleaser/v2@latest
 
 .PHONY: build
 build:
@@ -16,6 +17,15 @@ test:
 .PHONY: clean
 clean:
 	rm -f $(BINARY_NAME)
+	rm -rf dist/
+
+.PHONY: release-snapshot
+release-snapshot:
+	$(GORELEASER) release --snapshot --clean
+
+.PHONY: release-test
+release-test:
+	$(GORELEASER) check
 
 # Infrastructure targets
 .PHONY: infra-deploy
