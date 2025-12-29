@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"os"
@@ -431,5 +431,111 @@ func TestDefaultParseOptions(t *testing.T) {
 
 	if opts.MaxConcurrency != 100 {
 		t.Errorf("Expected MaxConcurrency to be 100, got %d", opts.MaxConcurrency)
+	}
+}
+
+func TestMediaParser_ParseWithProgressChannel(t *testing.T) {
+	tmpDir := t.TempDir()
+	sourceDir, targetDir := createSourceAndTarget(t, tmpDir)
+
+	// Create test files
+	subdir := filepath.Join(sourceDir, "vacation")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	testFiles := []string{"photo1.jpg", "photo2.jpg", "video.mov"}
+	for _, filename := range testFiles {
+		filePath := filepath.Join(subdir, filename)
+		if err := os.WriteFile(filePath, []byte("test content"), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	// Create progress channel with buffer
+	progressChan := make(chan ProgressEvent, 100)
+
+	// Run parse with progress channel
+	opts := testParseOptions
+	opts.ProgressChan = progressChan
+
+	// Run parse in goroutine so we can read from channel
+	done := make(chan error)
+	go func() {
+		done <- testParser.Parse(sourceDir, targetDir, opts)
+	}()
+
+	// Collect progress events
+	var events []ProgressEvent
+	timeout := time.After(5 * time.Second)
+	isDone := false
+
+	for !isDone {
+		select {
+		case event := <-progressChan:
+			events = append(events, event)
+		case err := <-done:
+			// Parse finished, drain any remaining events
+			close(progressChan)
+			for event := range progressChan {
+				events = append(events, event)
+			}
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+			isDone = true
+		case <-timeout:
+			t.Fatal("Test timed out waiting for parse to complete")
+		}
+	}
+
+	// Verify we received progress events
+	if len(events) == 0 {
+		t.Fatal("Expected to receive progress events, got none")
+	}
+
+	t.Logf("Received %d progress events", len(events))
+
+	// Verify event structure
+	stages := make(map[string]int)
+
+	for i, event := range events {
+		stages[event.Stage]++
+
+		// Verify required fields are set
+		if event.Stage == "" {
+			t.Errorf("Event %d: missing Stage", i)
+		}
+		if event.Message == "" {
+			t.Errorf("Event %d: missing Message", i)
+		}
+		if event.Current < 0 {
+			t.Errorf("Event %d: invalid Current value: %d", i, event.Current)
+		}
+		if event.Total < 0 {
+			t.Errorf("Event %d: invalid Total value: %d", i, event.Total)
+		}
+		if event.Current > event.Total {
+			t.Errorf("Event %d: Current (%d) exceeds Total (%d)", i, event.Current, event.Total)
+		}
+		if event.Total > 0 && event.Current == 0 {
+			t.Errorf("Event %d: Current is 0 but Total is %d", i, event.Total)
+		}
+	}
+
+	// Verify we got expected stages
+	expectedStages := []string{"copying", "organising", "renaming"}
+	for _, stage := range expectedStages {
+		if count, found := stages[stage]; !found {
+			t.Errorf("Expected to see stage '%s' but it was not present", stage)
+		} else {
+			t.Logf("Stage '%s': %d events", stage, count)
+		}
+	}
+
+	// Print sample events for debugging
+	if len(events) > 0 {
+		t.Logf("Sample event: Stage=%s, Current=%d, Total=%d, Message=%s",
+			events[0].Stage, events[0].Current, events[0].Total, events[0].Message)
 	}
 }

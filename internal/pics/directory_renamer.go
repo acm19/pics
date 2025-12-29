@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/acm19/pics/internal/logger"
 )
 
 // DirectoryRenamer defines the interface for renaming date-based directories
@@ -115,7 +117,7 @@ func (r *directoryRenamer) RenameDirectory(directory, newName string) error {
 
 // renameImages renames all image files in the directory
 func (r *directoryRenamer) renameImages(absDir, newBaseName string) error {
-	imageCount, err := r.fileRenamer.RenameFilesWithPattern(absDir, newBaseName, r.extensions.IsImage)
+	imageCount, err := r.fileRenamer.RenameFilesWithPattern(absDir, newBaseName, r.extensions.IsImage, nil)
 	if err != nil {
 		return err
 	}
@@ -135,7 +137,7 @@ func (r *directoryRenamer) renameVideos(absDir, newBaseName string) error {
 		return nil
 	}
 
-	videoCount, err := r.fileRenamer.MoveAndRenameFilesWithPattern(videosDir, videosDir, newBaseName, r.extensions.IsVideo)
+	videoCount, err := r.fileRenamer.MoveAndRenameFilesWithPattern(videosDir, videosDir, newBaseName, r.extensions.IsVideo, nil)
 	if err != nil {
 		return err
 	}

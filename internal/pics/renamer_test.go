@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"os"
@@ -20,7 +20,7 @@ func TestFileRenamer_RenameFilesWithPattern(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage)
+	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -50,7 +50,7 @@ func TestFileRenamer_RenameFilesWithPattern_EmptyDirectory(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage)
+	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error for empty directory, got: %v", err)
@@ -74,7 +74,7 @@ func TestFileRenamer_RenameFilesWithPattern_NoMatchingFiles(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage)
+	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error when no matching files, got: %v", err)
@@ -101,7 +101,7 @@ func TestFileRenamer_RenameFilesWithPattern_SkipsDirectories(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage)
+	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -128,7 +128,7 @@ func TestFileRenamer_RenameFilesWithPattern_SortedOrder(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.RenameFilesWithPattern(testDir, "sorted", ext.IsImage)
+	_, err := renamer.RenameFilesWithPattern(testDir, "sorted", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -153,7 +153,7 @@ func TestFileRenamer_RenameFilesWithPattern_NormalisesExtensions(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.RenameFilesWithPattern(testDir, "normalised", ext.IsImage)
+	_, err := renamer.RenameFilesWithPattern(testDir, "normalised", ext.IsImage, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -179,7 +179,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	count, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid_prefix", ext.IsVideo)
+	count, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid_prefix", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -216,7 +216,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NormalisesExtensions(t *testi
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "video", ext.IsVideo)
+	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "video", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -238,7 +238,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_EmptySource(t *testing.T) {
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo)
+	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error for empty source, got: %v", err)
@@ -262,7 +262,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NoMatchingFiles(t *testing.T)
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo)
+	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error when no matching files, got: %v", err)
@@ -290,7 +290,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_InPlace(t *testing.T) {
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
 	// Move to same directory (rename in place)
-	_, err := renamer.MoveAndRenameFilesWithPattern(testDir, testDir, "video", ext.IsVideo)
+	_, err := renamer.MoveAndRenameFilesWithPattern(testDir, testDir, "video", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -307,7 +307,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NonexistentSource(t *testing.
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.MoveAndRenameFilesWithPattern("/nonexistent/source", targetDir, "prefix", ext.IsImage)
+	_, err := renamer.MoveAndRenameFilesWithPattern("/nonexistent/source", targetDir, "prefix", ext.IsImage, nil)
 
 	if err == nil {
 		t.Error("Expected error for nonexistent source directory")
@@ -329,7 +329,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_CreatesTargetOnlyWhenNeeded(t
 
 	renamer := NewFileRenamer()
 	ext := NewExtensions()
-	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid", ext.IsVideo)
+	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid", ext.IsVideo, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)

@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/acm19/pics/internal/logger"
+	"github.com/acm19/pics/internal/pics"
 	"github.com/spf13/cobra"
 )
 
-// version is set at build time via -ldflags
+// version is set at build time via -ldflags.
 var version = "dev"
 
 var rootCmd = &cobra.Command{
@@ -85,13 +87,13 @@ func runParse(cmd *cobra.Command, args []string) {
 	sourceDir := args[0]
 	targetDir := args[1]
 
-	fileStats := NewFileStats()
+	fileStats := pics.NewFileStats()
 	if err := fileStats.ValidateDirectories(sourceDir, targetDir); err != nil {
 		logger.Error("Directory validation failed", "error", err)
 		os.Exit(1)
 	}
 
-	opts := DefaultParseOptions()
+	opts := pics.DefaultParseOptions()
 	opts.JPEGQuality = jpegQuality
 
 	sourceCount, err := fileStats.GetFileCount(sourceDir)
@@ -101,7 +103,7 @@ func runParse(cmd *cobra.Command, args []string) {
 	}
 
 	logger.Info("Starting media parsing", "source", sourceDir, "target", targetDir)
-	parser := NewMediaParser()
+	parser := pics.NewMediaParser()
 	if err := parser.Parse(sourceDir, targetDir, opts); err != nil {
 		logger.Error("Parse failed", "error", err)
 		os.Exit(1)
@@ -125,7 +127,7 @@ func runRename(cmd *cobra.Command, args []string) {
 	directory := args[0]
 	newName := args[1]
 
-	renamer := NewDirectoryRenamer()
+	renamer := pics.NewDirectoryRenamer()
 	if err := renamer.RenameDirectory(directory, newName); err != nil {
 		logger.Error("Rename failed", "error", err)
 		os.Exit(1)
@@ -149,14 +151,14 @@ func runBackup(cmd *cobra.Command, args []string) {
 
 	// Create backup instance
 	ctx := context.Background()
-	backup, err := NewS3Backup(ctx)
+	backup, err := pics.NewS3Backup(ctx)
 	if err != nil {
 		logger.Error("Failed to initialize backup", "error", err)
 		os.Exit(1)
 	}
 
 	logger.Info("Starting backup", "source", sourceDir, "bucket", bucket, "max_concurrent", maxConcurrent)
-	if err := backup.BackupDirectories(ctx, sourceDir, bucket, maxConcurrent); err != nil {
+	if err := backup.BackupDirectories(ctx, sourceDir, bucket, maxConcurrent, nil); err != nil {
 		logger.Error("Backup failed", "error", err)
 		os.Exit(1)
 	}
@@ -169,7 +171,7 @@ func runRestore(cmd *cobra.Command, args []string) {
 	targetDir := args[1]
 
 	// Parse filter
-	var filter RestoreFilter
+	var filter pics.RestoreFilter
 
 	if fromFilter != "" {
 		year, month, err := parseYearMonth(fromFilter)
@@ -202,14 +204,14 @@ func runRestore(cmd *cobra.Command, args []string) {
 
 	// Create backup instance
 	ctx := context.Background()
-	backup, err := NewS3Backup(ctx)
+	backup, err := pics.NewS3Backup(ctx)
 	if err != nil {
 		logger.Error("Failed to initialize backup", "error", err)
 		os.Exit(1)
 	}
 
 	logger.Info("Starting restore", "bucket", bucket, "target", targetDir, "max_concurrent", maxConcurrent, "filter", filter)
-	if err := backup.RestoreDirectories(ctx, bucket, targetDir, filter, maxConcurrent); err != nil {
+	if err := backup.RestoreDirectories(ctx, bucket, targetDir, filter, maxConcurrent, nil); err != nil {
 		logger.Error("Restore failed", "error", err)
 		os.Exit(1)
 	}
@@ -217,7 +219,7 @@ func runRestore(cmd *cobra.Command, args []string) {
 	logger.Info("Restore completed successfully")
 }
 
-// parseYearMonth parses a date string in format "YYYY" or "MM/YYYY"
+// parseYearMonth parses a date string in format "YYYY" or "MM/YYYY".
 // Returns (year, month, error). Month is 0 if not specified.
 func parseYearMonth(s string) (int, int, error) {
 	parts := strings.Split(s, "/")

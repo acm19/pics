@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"fmt"
@@ -7,35 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/acm19/pics/internal/logger"
 )
 
 // MediaParser defines the interface for parsing and organising media files
 type MediaParser interface {
 	// Parse processes media files from source to target directory
 	Parse(sourceDir, targetDir string, opts ParseOptions) error
-}
-
-// ParseOptions holds configuration options for parsing
-type ParseOptions struct {
-	// CompressJPEGs enables JPEG compression
-	CompressJPEGs bool
-	// JPEGQuality is the quality level for JPEG compression (0-100)
-	JPEGQuality int
-	// TempDirName is the name of the temporary directory to use
-	TempDirName string
-	// MaxConcurrency is the maximum number of files to process concurrently (0 = unlimited)
-	MaxConcurrency int
-}
-
-// DefaultParseOptions returns the default parsing options
-func DefaultParseOptions() ParseOptions {
-	return ParseOptions{
-		CompressJPEGs:  true,
-		JPEGQuality:    50,
-		TempDirName:    "tmp_image",
-		MaxConcurrency: 100,
-	}
 }
 
 // mediaParser implements the MediaParser interface
@@ -75,7 +56,7 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 	logger.Info("Processing completed", "duration_seconds", processDuration.Seconds())
 
 	logger.Info("Organising files by date")
-	if err := p.organiser.OrganiseByDate(tmpTarget, targetDir); err != nil {
+	if err := p.organiser.OrganiseByDate(tmpTarget, targetDir, opts.ProgressChan); err != nil {
 		return fmt.Errorf("failed to organise by date: %w", err)
 	}
 
@@ -86,7 +67,7 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 	}
 
 	logger.Info("Organising videos and renaming images")
-	if err := p.organiser.OrganiseVideosAndRenameImages(targetDir); err != nil {
+	if err := p.organiser.OrganiseVideosAndRenameImages(targetDir, opts.ProgressChan); err != nil {
 		return fmt.Errorf("failed to organise videos and rename images: %w", err)
 	}
 
@@ -112,14 +93,19 @@ func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts Par
 	var wg sync.WaitGroup
 	errChan := make(chan error, numWorkers)
 
-	// Start worker pool
+	// Track progress
+	var processedCount atomic.Int64
+	var totalCount atomic.Int64
+
+	// Discover files first to know the total count
+	fileCount := p.discoverFiles(sourceDir, tmpTarget, jobs)
+	totalCount.Store(int64(fileCount))
+
+	// Start worker pool after we know the total
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go p.processFileWorker(jobs, errChan, opts, &wg)
+		go p.processFileWorker(jobs, errChan, opts, &wg, &processedCount, &totalCount)
 	}
-
-	// Discover and send files to workers
-	go p.discoverFiles(sourceDir, tmpTarget, jobs)
 
 	wg.Wait()
 	close(errChan)
@@ -147,10 +133,32 @@ func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts Par
 }
 
 // processFileWorker processes files from the jobs channel
-func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<- error, opts ParseOptions, wg *sync.WaitGroup) {
+func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<- error, opts ParseOptions, wg *sync.WaitGroup, processedCount *atomic.Int64, totalCount *atomic.Int64) {
 	defer wg.Done()
 	for file := range jobs {
 		logger.Debug("Copying file", "from", file.srcPath, "to", file.destPath)
+
+		// Increment processed count
+		processedCount.Add(1)
+
+		// Emit copying progress event
+		if opts.ProgressChan != nil {
+			current := processedCount.Load()
+			total := totalCount.Load()
+
+			select {
+			case opts.ProgressChan <- ProgressEvent{
+				Stage:   "copying",
+				Current: int(current),
+				Total:   int(total),
+				Message: fmt.Sprintf("Copying file %d of %d", current, total),
+				File:    file.srcPath,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "copying")
+			}
+		}
+
 		if err := copyFilePreserveTime(file.srcPath, file.destPath); err != nil {
 			errChan <- fmt.Errorf("failed to copy %s: %w", file.srcPath, err)
 			continue
@@ -158,6 +166,25 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 
 		if file.isJPEG && opts.CompressJPEGs {
 			logger.Debug("Compressing file", "path", file.destPath)
+
+			// Emit compression progress event
+			if opts.ProgressChan != nil {
+				current := processedCount.Load()
+				total := totalCount.Load()
+
+				select {
+				case opts.ProgressChan <- ProgressEvent{
+					Stage:   "compressing",
+					Current: int(current),
+					Total:   int(total),
+					Message: fmt.Sprintf("Compressing file %d of %d", current, total),
+					File:    file.destPath,
+				}:
+				default:
+					logger.Debug("Progress event dropped (channel full)", "stage", "compressing")
+				}
+			}
+
 			if err := p.compressor.CompressFile(file.destPath, opts.JPEGQuality); err != nil {
 				errChan <- fmt.Errorf("failed to compress %s: %w", file.destPath, err)
 				continue
@@ -169,10 +196,11 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 }
 
 // discoverFiles walks directories recursively and sends files to the jobs channel
-func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) {
+func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) int {
 	defer close(jobs)
 	logger.Info("Discovering files to process", "source", sourceDir)
 
+	fileCount := 0
 	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			logger.Debug("Error accessing path", "path", path, "error", err)
@@ -213,9 +241,11 @@ func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fil
 				destPath: destPath,
 				isJPEG:   p.extensions.IsJPEG(path),
 			}
+			fileCount++
 		}
 		return nil
 	})
+	return fileCount
 }
 
 // copyFilePreserveTime copies a file and preserves its modification time

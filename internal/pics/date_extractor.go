@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/acm19/pics/internal/logger"
 	"github.com/barasher/go-exiftool"
 )
 

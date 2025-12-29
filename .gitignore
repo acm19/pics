@@ -3,5 +3,8 @@
 .idea
 
 # build files
-pics
+/pics
+pics-ui
 dist/
+build/
+apps/ui/frontend/node_modules/

@@ -6,7 +6,10 @@ before:
     - go test ./...
 
 builds:
-  - env:
+  - id: cli
+    main: ./apps/cli
+    binary: pics
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -17,11 +20,11 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.version={{.Version}}
-    binary: pics
 
 archives:
-  - name_template: >-
-      {{ .ProjectName }}_
+  - id: cli-archives
+    name_template: >-
+      {{ .ProjectName }}-cli_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -55,12 +58,13 @@ release:
   header: |
     ## Installation
 
-    Download the binary for your platform from the assets below.
+    ### CLI (pics)
+    Lightweight command-line tool.
 
-    ### Linux/macOS
+    **Linux/macOS:**
     ```bash
     # Extract the archive
-    tar -xzf pics_*.tar.gz
+    tar -xzf pics-cli_*.tar.gz
 
     # Make executable and move to PATH
     chmod +x pics
@@ -70,12 +74,15 @@ release:
     pics --version
     ```
 
-    ### Windows
-    Extract the zip file and add `pics.exe` to your PATH.
+    **Windows:**
+    Extract `pics-cli_Windows_*.zip` and add `pics.exe` to your PATH.
 
-    ### Dependencies
-    - **ExifTool**: Required for EXIF data extraction
-    - **jpegoptim**: Required for JPEG compression (optional)
+    ### Desktop UI (pics-ui)
+    Full-featured desktop application with bundled dependencies (coming soon).
+
+    ### Dependencies (CLI only)
+    - **ExifTool**: Required for EXIF data extraction.
+    - **jpegoptim**: Required for JPEG compression (optional).
 
   footer: |
     **Full Changelog**: https://github.com/acm19/pics/compare/{{ .PreviousTag }}...{{ .Tag }}

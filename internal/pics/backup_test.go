@@ -1,12 +1,14 @@
-package main
+package pics
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -483,5 +485,123 @@ func TestIsNotFoundError_APIError(t *testing.T) {
 	err2 := &mockAPIError{code: "OtherError"}
 	if isNotFoundError(err2) {
 		t.Error("Expected isNotFoundError to return false for other API error")
+	}
+}
+
+func TestS3Backup_BackupWithProgressChannel(t *testing.T) {
+	client := NewInMemoryS3Client()
+
+	backup := &s3Backup{
+		client:     client,
+		extensions: NewExtensions(),
+	}
+
+	// Create test directory structure
+	tmpDir := t.TempDir()
+	sourceDir := filepath.Join(tmpDir, "photos")
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		t.Fatalf("Failed to create source dir: %v", err)
+	}
+
+	// Create multiple subdirectories with files
+	for i := 1; i <= 3; i++ {
+		subdir := filepath.Join(sourceDir, fmt.Sprintf("2024-0%d", i))
+		if err := os.MkdirAll(subdir, 0755); err != nil {
+			t.Fatalf("Failed to create subdir: %v", err)
+		}
+		// Add test files
+		for j := 1; j <= 2; j++ {
+			filePath := filepath.Join(subdir, fmt.Sprintf("photo%d.jpg", j))
+			if err := os.WriteFile(filePath, []byte("test content"), 0644); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+		}
+	}
+
+	// Create progress channel with buffer
+	progressChan := make(chan ProgressEvent, 100)
+
+	// Run backup in goroutine
+	done := make(chan error)
+	go func() {
+		done <- backup.BackupDirectories(context.Background(), sourceDir, "test-bucket", 2, progressChan)
+	}()
+
+	// Collect progress events
+	var events []ProgressEvent
+	timeout := time.After(5 * time.Second)
+	isDone := false
+
+	for !isDone {
+		select {
+		case event := <-progressChan:
+			events = append(events, event)
+		case err := <-done:
+			// Backup finished, drain any remaining events
+			close(progressChan)
+			for event := range progressChan {
+				events = append(events, event)
+			}
+			if err != nil {
+				t.Fatalf("Backup failed: %v", err)
+			}
+			isDone = true
+		case <-timeout:
+			t.Fatal("Test timed out waiting for backup to complete")
+		}
+	}
+
+	// Verify we received progress events
+	if len(events) == 0 {
+		t.Fatal("Expected to receive progress events, got none")
+	}
+
+	t.Logf("Received %d progress events", len(events))
+
+	// Verify event structure and state progression
+	var lastCurrent int
+	var total int
+
+	for i, event := range events {
+		// Verify required fields
+		if event.Stage != "backing up" {
+			t.Errorf("Event %d: expected stage 'backing up', got '%s'", i, event.Stage)
+		}
+		if event.Message == "" {
+			t.Errorf("Event %d: missing Message", i)
+		}
+		if event.File == "" {
+			t.Errorf("Event %d: missing File", i)
+		}
+
+		// Verify Total is consistent
+		if total == 0 {
+			total = event.Total
+			if total != 3 {
+				t.Errorf("Expected Total=3 (3 subdirectories), got %d", total)
+			}
+		} else if event.Total != total {
+			t.Errorf("Event %d: Total changed from %d to %d", i, total, event.Total)
+		}
+
+		// Verify Current is monotonically increasing
+		if event.Current < lastCurrent {
+			t.Errorf("Event %d: Current decreased from %d to %d", i, lastCurrent, event.Current)
+		}
+		if event.Current > event.Total {
+			t.Errorf("Event %d: Current (%d) exceeds Total (%d)", i, event.Current, event.Total)
+		}
+		lastCurrent = event.Current
+	}
+
+	// Verify we reached the total
+	if lastCurrent != total {
+		t.Errorf("Did not reach total: max Current=%d, Total=%d", lastCurrent, total)
+	}
+
+	// Print sample event for debugging
+	if len(events) > 0 {
+		t.Logf("Sample event: Stage=%s, Current=%d, Total=%d, Message=%s, File=%s",
+			events[0].Stage, events[0].Current, events[0].Total, events[0].Message, events[0].File)
 	}
 }

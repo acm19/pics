@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/acm19/pics/internal/logger"
 )
 
 // fileFilter is a function that determines if a file should be renamed
@@ -23,11 +25,12 @@ type FileRenamer interface {
 	//   - dir: The directory containing files to rename
 	//   - baseName: The base name to use for renamed files (e.g., "vacation" produces "vacation_00001.jpg")
 	//   - filter: A function that determines which files should be renamed
+	//   - progressChan: Optional channel for progress events
 	//
 	// Returns:
 	//   - int: The number of files that were renamed
 	//   - error: An error if the directory cannot be read or files cannot be renamed
-	RenameFilesWithPattern(dir, baseName string, filter fileFilter) (int, error)
+	RenameFilesWithPattern(dir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error)
 
 	// MoveAndRenameFilesWithPattern moves files to a target directory and renames them with sequential numbering.
 	//
@@ -43,11 +46,12 @@ type FileRenamer interface {
 	//   - targetDir: The directory where files will be moved (created if needed and files exist)
 	//   - baseName: The base name to use for renamed files
 	//   - filter: A function that determines which files should be moved and renamed
+	//   - progressChan: Optional channel for progress events
 	//
 	// Returns:
 	//   - int: The number of files that were moved and renamed
 	//   - error: An error if directories cannot be accessed or files cannot be moved
-	MoveAndRenameFilesWithPattern(sourceDir, targetDir, baseName string, filter fileFilter) (int, error)
+	MoveAndRenameFilesWithPattern(sourceDir, targetDir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error)
 }
 
 // fileRenamer implements the FileRenamer interface
@@ -59,17 +63,17 @@ func NewFileRenamer() FileRenamer {
 }
 
 // RenameFilesWithPattern renames files in a directory based on a filter and naming pattern
-func (r *fileRenamer) RenameFilesWithPattern(dir, baseName string, filter fileFilter) (int, error) {
-	return r.renameFilesWithPatternInDir(dir, dir, baseName, filter)
+func (r *fileRenamer) RenameFilesWithPattern(dir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error) {
+	return r.renameFilesWithPatternInDir(dir, dir, baseName, filter, progressChan)
 }
 
 // MoveAndRenameFilesWithPattern moves files to a target directory and renames them
-func (r *fileRenamer) MoveAndRenameFilesWithPattern(sourceDir, targetDir, baseName string, filter fileFilter) (int, error) {
-	return r.renameFilesWithPatternInDir(sourceDir, targetDir, baseName, filter)
+func (r *fileRenamer) MoveAndRenameFilesWithPattern(sourceDir, targetDir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error) {
+	return r.renameFilesWithPatternInDir(sourceDir, targetDir, baseName, filter, progressChan)
 }
 
 // renameFilesWithPatternInDir is the internal implementation
-func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName string, filter fileFilter) (int, error) {
+func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error) {
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read directory: %w", err)
@@ -103,7 +107,23 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 	sort.Strings(filesToRename)
 
 	// Rename each file with sequential numbering
+	totalFiles := len(filesToRename)
 	for i, file := range filesToRename {
+		// Emit progress event
+		if progressChan != nil {
+			select {
+			case progressChan <- ProgressEvent{
+				Stage:   "renaming",
+				Current: i + 1,
+				Total:   totalFiles,
+				Message: fmt.Sprintf("Renaming file %d of %d", i+1, totalFiles),
+				File:    file,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "renaming")
+			}
+		}
+
 		ext := strings.ToLower(filepath.Ext(file))
 		newFileName := fmt.Sprintf("%s_%05d%s", baseName, i+1, ext)
 		newFilePath := filepath.Join(targetDir, newFileName)

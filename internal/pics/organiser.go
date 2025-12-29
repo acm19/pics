@@ -1,18 +1,20 @@
-package main
+package pics
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/acm19/pics/internal/logger"
 )
 
 // FileOrganiser defines the interface for organising files
 type FileOrganiser interface {
 	// OrganiseByDate moves files to date-based directories
-	OrganiseByDate(sourceDir, targetDir string) error
+	OrganiseByDate(sourceDir, targetDir string, progressChan chan<- ProgressEvent) error
 	// OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially
-	OrganiseVideosAndRenameImages(targetDir string) error
+	OrganiseVideosAndRenameImages(targetDir string, progressChan chan<- ProgressEvent) error
 }
 
 // fileOrganiser implements the FileOrganiser interface
@@ -32,16 +34,42 @@ func NewFileOrganiser() FileOrganiser {
 }
 
 // OrganiseByDate moves files to date-based directories
-func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string) error {
+func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan chan<- ProgressEvent) error {
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
 		return err
 	}
+
+	// Count total files
+	totalFiles := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			totalFiles++
+		}
+	}
+
+	current := 0
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		filePath := filepath.Join(sourceDir, entry.Name())
+		current++
+
+		// Emit progress event
+		if progressChan != nil {
+			select {
+			case progressChan <- ProgressEvent{
+				Stage:   "organising",
+				Current: current,
+				Total:   totalFiles,
+				Message: fmt.Sprintf("Organising file %d of %d", current, totalFiles),
+				File:    filePath,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "organising")
+			}
+		}
 
 		// Get file date from EXIF if available, otherwise use ModTime
 		fileDate, err := o.dateExtractor.GetFileDate(filePath)
@@ -62,21 +90,48 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string) error {
 }
 
 // OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially
-func (o *fileOrganiser) OrganiseVideosAndRenameImages(targetDir string) error {
+func (o *fileOrganiser) OrganiseVideosAndRenameImages(targetDir string, progressChan chan<- ProgressEvent) error {
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
 		return err
 	}
+
+	// Count total directories
+	totalDirs := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			totalDirs++
+		}
+	}
+
+	current := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		dirPath := filepath.Join(targetDir, entry.Name())
+		current++
+
+		// Emit progress event
+		if progressChan != nil {
+			select {
+			case progressChan <- ProgressEvent{
+				Stage:   "organising",
+				Current: current,
+				Total:   totalDirs,
+				Message: fmt.Sprintf("Organising directory %d of %d", current, totalDirs),
+				File:    dirPath,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "organising")
+			}
+		}
+
 		logger.Debug("Organising file %s/%s", dirPath, entry.Name())
-		if err := o.organiseVideos(dirPath, entry.Name()); err != nil {
+		if err := o.organiseVideos(dirPath, entry.Name(), progressChan); err != nil {
 			return err
 		}
-		if err := o.renameImages(dirPath, entry.Name()); err != nil {
+		if err := o.renameImages(dirPath, entry.Name(), progressChan); err != nil {
 			return err
 		}
 	}
@@ -84,24 +139,24 @@ func (o *fileOrganiser) OrganiseVideosAndRenameImages(targetDir string) error {
 }
 
 // organiseVideos moves video files to a videos subdirectory and renames them sequentially
-func (o *fileOrganiser) organiseVideos(dir string, dirName string) error {
+func (o *fileOrganiser) organiseVideos(dir string, dirName string, progressChan chan<- ProgressEvent) error {
 	parts := strings.Fields(dirName)
 	if len(parts) != 4 {
 		return fmt.Errorf("unexpected directory name format: %s", dirName)
 	}
 	videosName := strings.Join(parts, "_")
 	videosDir := filepath.Join(dir, "videos")
-	_, err := o.fileRenamer.MoveAndRenameFilesWithPattern(dir, videosDir, videosName, o.extensions.IsVideo)
+	_, err := o.fileRenamer.MoveAndRenameFilesWithPattern(dir, videosDir, videosName, o.extensions.IsVideo, progressChan)
 	return err
 }
 
 // renameImages renames image files with a sequential pattern
-func (o *fileOrganiser) renameImages(dir, dirName string) error {
+func (o *fileOrganiser) renameImages(dir, dirName string, progressChan chan<- ProgressEvent) error {
 	parts := strings.Fields(dirName)
 	if len(parts) != 4 {
 		return fmt.Errorf("unexpected directory name format: %s", dirName)
 	}
 	picsName := strings.Join(parts, "_")
-	_, err := o.fileRenamer.RenameFilesWithPattern(dir, picsName, o.extensions.IsImage)
+	_, err := o.fileRenamer.RenameFilesWithPattern(dir, picsName, o.extensions.IsImage, progressChan)
 	return err
 }

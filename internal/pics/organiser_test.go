@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"os"
@@ -74,7 +74,7 @@ func TestFileOrganiser_OrganiseByDate(t *testing.T) {
 
 	// Organise files by date
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseByDate(sourceDir, targetDir)
+	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -103,7 +103,7 @@ func TestFileOrganiser_OrganiseByDate_MultipleDates(t *testing.T) {
 	createFileWithDate(t, sourceDir, "july.jpg", date2)
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseByDate(sourceDir, targetDir)
+	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -129,7 +129,7 @@ func TestFileOrganiser_OrganiseByDate_SkipsDirectories(t *testing.T) {
 	createFileWithDate(t, sourceDir, "image1.jpg", testDate)
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseByDate(sourceDir, targetDir)
+	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -147,7 +147,7 @@ func TestFileOrganiser_OrganiseByDate_NonexistentSource(t *testing.T) {
 	targetDir := filepath.Join(tmpDir, "target")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseByDate("/nonexistent/source", targetDir)
+	err := organiser.OrganiseByDate("/nonexistent/source", targetDir, nil)
 
 	if err == nil {
 		t.Error("Expected error for nonexistent source directory")
@@ -167,7 +167,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages(t *testing.T) {
 
 	// Organise videos and rename images
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -198,7 +198,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_OnlyImages(t *testing.T) {
 	createFile(t, dateDir, "img2.jpeg")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -221,7 +221,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_OnlyVideos(t *testing.T) {
 	createFile(t, dateDir, "vid1.mov")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -241,7 +241,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_EmptyDirectory(t *testing.T
 	dateDir := createDateDir(t, targetDir, "2023 06 June 15")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -262,7 +262,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_InvalidDirectoryFormat(t *t
 	createFile(t, invalidDir, "img.jpg")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err == nil {
 		t.Error("Expected error for invalid directory format")
@@ -281,7 +281,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_SkipsFiles(t *testing.T) {
 	createFile(t, dateDir, "img1.jpg")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -296,7 +296,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_SkipsFiles(t *testing.T) {
 
 func TestFileOrganiser_OrganiseVideosAndRenameImages_NonexistentTarget(t *testing.T) {
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages("/nonexistent/target")
+	err := organiser.OrganiseVideosAndRenameImages("/nonexistent/target", nil)
 
 	if err == nil {
 		t.Error("Expected error for nonexistent target directory")
@@ -316,7 +316,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_NormalisesExtensions(t *tes
 	createFile(t, dateDir, "vid1.MOV")
 
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -343,7 +343,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_MP4Videos(t *testing.T) {
 
 	// Organise videos and rename images
 	organiser := NewFileOrganiser()
-	err := organiser.OrganiseVideosAndRenameImages(targetDir)
+	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)

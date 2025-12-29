@@ -1,14 +1,29 @@
-BINARY_NAME=pics
+BINARY_NAME_CLI=pics
+BINARY_NAME_UI=pics-ui
 GORELEASER := go run github.com/goreleaser/goreleaser/v2@latest
 
 .PHONY: build
-build:
-	go build -o $(BINARY_NAME) .
+build: build-cli
+
+.PHONY: build-cli
+build-cli:
+	go build -o $(BINARY_NAME_CLI) ./apps/cli
+
+.PHONY: build-ui
+build-ui:
+	cd apps/ui && wails build
+
+.PHONY: build-all
+build-all: build-cli build-ui
+
+.PHONY: dev-ui
+dev-ui:
+	cd apps/ui && wails dev
 
 .PHONY: run
-# Example: make run ARGS="/source /target"
+# Example: make run ARGS="parse /source /target"
 run:
-	go run . $(ARGS)
+	go run ./apps/cli $(ARGS)
 
 .PHONY: test
 test:
@@ -16,7 +31,8 @@ test:
 
 .PHONY: clean
 clean:
-	rm -f $(BINARY_NAME)
+	rm -f $(BINARY_NAME_CLI)
+	rm -rf apps/ui/build
 	rm -rf dist/
 
 .PHONY: release-snapshot

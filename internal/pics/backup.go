@@ -1,4 +1,4 @@
-package main
+package pics
 
 import (
 	"archive/tar"
@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
+	"github.com/acm19/pics/internal/logger"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -25,14 +27,6 @@ const (
 	tempDirPrefix        = "pics_tmp_*"
 	tempRestoreDirPrefix = "pics_restore_*"
 )
-
-// RestoreFilter defines the date range filter for restoring backups
-type RestoreFilter struct {
-	FromYear  int // 0 means no lower bound
-	FromMonth int // 0 means January if FromYear is set
-	ToYear    int // 0 means no upper bound
-	ToMonth   int // 0 means December if ToYear is set
-}
 
 // S3ClientInterface defines the S3 operations we use
 // The real *s3.Client naturally satisfies this interface (duck typing)
@@ -46,9 +40,9 @@ type S3ClientInterface interface {
 // Backup defines the interface for backing up and restoring directories
 type Backup interface {
 	// BackupDirectories backs up all subdirectories in the source directory
-	BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int) error
+	BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int, progressChan chan<- ProgressEvent) error
 	// RestoreDirectories restores directories to target directory
-	RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error
+	RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int, progressChan chan<- ProgressEvent) error
 }
 
 // s3Backup implements the Backup interface for AWS S3
@@ -138,7 +132,7 @@ func runWorkerPool[T any](jobs []T, maxConcurrent int, workerFunc func(T) error)
 }
 
 // BackupDirectories backs up all subdirectories to S3 in parallel
-func (b *s3Backup) BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int) error {
+func (b *s3Backup) BackupDirectories(ctx context.Context, sourceDir, bucket string, maxConcurrent int, progressChan chan<- ProgressEvent) error {
 	// Find all subdirectories
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
@@ -159,13 +153,39 @@ func (b *s3Backup) BackupDirectories(ctx context.Context, sourceDir, bucket stri
 
 	logger.Info("Starting S3 backup", "directories", len(directories), "bucket", bucket, "concurrency", maxConcurrent)
 
+	// Track progress
+	var processedCount atomic.Int64
+	totalDirs := len(directories)
+
 	// Run worker pool
 	err = runWorkerPool(directories, maxConcurrent, func(dirName string) error {
 		logger.Debug("Processing directory", "directory", dirName)
+
+		// Increment processed count
+		processedCount.Add(1)
+
+		// Emit progress event
+		if progressChan != nil {
+			current := processedCount.Load()
+
+			select {
+			case progressChan <- ProgressEvent{
+				Stage:   "backing up",
+				Current: int(current),
+				Total:   totalDirs,
+				Message: fmt.Sprintf("Backing up directory %d of %d", current, totalDirs),
+				File:    dirName,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "backing up")
+			}
+		}
+
 		if err := b.backupDirectory(ctx, sourceDir, dirName, bucket); err != nil {
 			logger.Error("Failed to backup directory", "directory", dirName, "error", err)
 			return fmt.Errorf("directory %s: %w", dirName, err)
 		}
+
 		return nil
 	})
 
@@ -430,7 +450,7 @@ func (b *s3Backup) uploadToS3(ctx context.Context, filePath, bucket, key string)
 }
 
 // RestoreDirectories restores directories from S3 to target directory
-func (b *s3Backup) RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int) error {
+func (b *s3Backup) RestoreDirectories(ctx context.Context, bucket, targetDir string, filter RestoreFilter, maxConcurrent int, progressChan chan<- ProgressEvent) error {
 	// List all objects in bucket
 	logger.Info("Listing objects in S3 bucket", "bucket", bucket)
 	var allObjects []types.Object
@@ -464,13 +484,39 @@ func (b *s3Backup) RestoreDirectories(ctx context.Context, bucket, targetDir str
 
 	logger.Info("Starting restore", "objects", len(objectsToRestore), "target", targetDir, "concurrency", maxConcurrent)
 
+	// Track progress
+	var processedCount atomic.Int64
+	totalObjects := len(objectsToRestore)
+
 	// Run worker pool
 	err := runWorkerPool(objectsToRestore, maxConcurrent, func(obj types.Object) error {
 		logger.Debug("Processing object", "key", *obj.Key)
+
+		// Increment processed count
+		processedCount.Add(1)
+
+		// Emit progress event
+		if progressChan != nil {
+			current := processedCount.Load()
+
+			select {
+			case progressChan <- ProgressEvent{
+				Stage:   "restoring",
+				Current: int(current),
+				Total:   totalObjects,
+				Message: fmt.Sprintf("Restoring directory %d of %d", current, totalObjects),
+				File:    *obj.Key,
+			}:
+			default:
+				logger.Debug("Progress event dropped (channel full)", "stage", "restoring")
+			}
+		}
+
 		if err := b.restoreObject(ctx, bucket, targetDir, *obj.Key); err != nil {
 			logger.Error("Failed to restore object", "key", *obj.Key, "error", err)
 			return fmt.Errorf("object %s: %w", *obj.Key, err)
 		}
+
 		return nil
 	})
 
