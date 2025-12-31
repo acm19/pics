@@ -55,6 +55,7 @@ var restoreCmd = &cobra.Command{
 }
 
 var (
+	compressJPEGs bool
 	jpegQuality   int
 	maxConcurrent int
 	fromFilter    string
@@ -63,6 +64,7 @@ var (
 
 func init() {
 	// Parse command flags
+	parseCmd.Flags().BoolVarP(&compressJPEGs, "compress", "c", true, "Enable JPEG compression")
 	parseCmd.Flags().IntVarP(&jpegQuality, "rate", "r", 50, "JPEG compression quality (0-100)")
 
 	// Backup command flags
@@ -94,6 +96,7 @@ func runParse(cmd *cobra.Command, args []string) {
 	}
 
 	opts := pics.DefaultParseOptions()
+	opts.CompressJPEGs = compressJPEGs
 	opts.JPEGQuality = jpegQuality
 
 	sourceCount, err := fileStats.GetFileCount(sourceDir)

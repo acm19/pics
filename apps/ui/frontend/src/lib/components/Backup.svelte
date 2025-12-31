@@ -97,9 +97,8 @@
       </div>
       {#if progress.total > 0}
         <div class="progress-bar">
-          <div class="progress-bar-fill" style="width: {progressPercent}%">
-            {progressPercent}%
-          </div>
+          <div class="progress-bar-fill" style="width: {progressPercent}%"></div>
+          <div class="progress-bar-text">{progressPercent}%</div>
         </div>
       {/if}
     </div>

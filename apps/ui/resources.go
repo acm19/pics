@@ -13,8 +13,10 @@ import (
 //go:embed build/resources/windows/jpegoptim.exe
 //go:embed build/resources/darwin/exiftool
 //go:embed build/resources/darwin/jpegoptim
+//go:embed build/resources/darwin/lib
 //go:embed build/resources/linux/exiftool
 //go:embed build/resources/linux/jpegoptim
+//go:embed build/resources/linux/lib
 var resources embed.FS
 
 // ExtractBinaries extracts the platform-specific exiftool and jpegoptim binaries
@@ -44,6 +46,13 @@ func ExtractBinaries() (exiftoolPath, jpegoptimPath string, err error) {
 	if platform != "windows" {
 		if err := os.Chmod(exiftoolPath, 0755); err != nil {
 			return "", "", fmt.Errorf("failed to make exiftool executable: %w", err)
+		}
+
+		// Extract lib directory for exiftool
+		libSrc := fmt.Sprintf("build/resources/%s/lib", platform)
+		libDest := filepath.Join(tempDir, "lib")
+		if err := extractDir(libSrc, libDest); err != nil {
+			return "", "", fmt.Errorf("failed to extract exiftool lib: %w", err)
 		}
 	}
 
@@ -81,6 +90,35 @@ func extractFile(src, dst string) error {
 
 	if _, err := io.WriteString(file, string(data)); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", dst, err)
+	}
+
+	return nil
+}
+
+// extractDir recursively extracts a directory from the embedded filesystem.
+func extractDir(src, dst string) error {
+	entries, err := resources.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read embedded dir %s: %w", src, err)
+	}
+
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return fmt.Errorf("failed to create dir %s: %w", dst, err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := extractDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := extractFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

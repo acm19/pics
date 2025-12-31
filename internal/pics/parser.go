@@ -48,13 +48,14 @@ func NewMediaParserWithPaths(jpegoptimPath string, organiser FileOrganiser) Medi
 func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) error {
 	sourceDir = strings.TrimSuffix(sourceDir, "/")
 	targetDir = strings.TrimSuffix(targetDir, "/")
-	tmpTarget := filepath.Join(targetDir, opts.TempDirName)
 
-	logger.Info("Creating temporary directory", "path", tmpTarget)
-	if err := os.MkdirAll(tmpTarget, 0755); err != nil {
+	// Create unique temporary directory in system temp with random suffix
+	tmpTarget, err := os.MkdirTemp("", "pics-*")
+	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tmpTarget)
+	logger.Info("Created temporary directory", "path", tmpTarget)
 
 	logger.Info("Processing media files (copy and compress)", "source", sourceDir, "target", tmpTarget)
 	processStart := time.Now()
@@ -67,12 +68,6 @@ func (p *mediaParser) Parse(sourceDir, targetDir string, opts ParseOptions) erro
 	logger.Info("Organising files by date")
 	if err := p.organiser.OrganiseByDate(tmpTarget, targetDir, opts.ProgressChan); err != nil {
 		return fmt.Errorf("failed to organise by date: %w", err)
-	}
-
-	// Remove temporary directory before organising (all files have been moved to date-based directories)
-	logger.Debug("Removing temporary directory", "path", tmpTarget)
-	if err := os.RemoveAll(tmpTarget); err != nil {
-		return fmt.Errorf("failed to remove temp directory: %w", err)
 	}
 
 	logger.Info("Organising videos and renaming images")
@@ -90,8 +85,40 @@ type fileToProcess struct {
 	isJPEG   bool
 }
 
+// countFiles counts the total number of supported files in the source directory
+func (p *mediaParser) countFiles(sourceDir string) (int, error) {
+	count := 0
+	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip dot files and dot directories
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if !info.IsDir() && p.extensions.IsSupported(path) {
+			count++
+		}
+		return nil
+	})
+	return count, err
+}
+
 // copyAndCompressFiles copies and optionally compresses files in parallel using a worker pool
 func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts ParseOptions) error {
+	// Count total files upfront for accurate progress reporting
+	logger.Info("Counting files", "source", sourceDir)
+	totalFiles, err := p.countFiles(sourceDir)
+	if err != nil {
+		return fmt.Errorf("failed to count files: %w", err)
+	}
+	logger.Info("File count complete", "total", totalFiles)
+
 	// Determine number of workers
 	numWorkers := opts.MaxConcurrency
 	if numWorkers <= 0 {
@@ -105,16 +132,16 @@ func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts Par
 	// Track progress
 	var processedCount atomic.Int64
 	var totalCount atomic.Int64
+	totalCount.Store(int64(totalFiles)) // Set total upfront
 
-	// Discover files first to know the total count
-	fileCount := p.discoverFiles(sourceDir, tmpTarget, jobs)
-	totalCount.Store(int64(fileCount))
-
-	// Start worker pool after we know the total
+	// Start worker pool first
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go p.processFileWorker(jobs, errChan, opts, &wg, &processedCount, &totalCount)
 	}
+
+	// Discover files in background (feeds workers as it discovers)
+	go p.discoverFiles(sourceDir, tmpTarget, jobs)
 
 	wg.Wait()
 	close(errChan)
@@ -205,11 +232,10 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 }
 
 // discoverFiles walks directories recursively and sends files to the jobs channel
-func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) int {
+func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fileToProcess) {
 	defer close(jobs)
 	logger.Info("Discovering files to process", "source", sourceDir)
 
-	fileCount := 0
 	filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			logger.Debug("Error accessing path", "path", path, "error", err)
@@ -250,11 +276,9 @@ func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fil
 				destPath: destPath,
 				isJPEG:   p.extensions.IsJPEG(path),
 			}
-			fileCount++
 		}
 		return nil
 	})
-	return fileCount
 }
 
 // copyFilePreserveTime copies a file and preserves its modification time

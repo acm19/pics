@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/acm19/pics/internal/logger"
 	"github.com/acm19/pics/internal/pics"
@@ -48,7 +51,7 @@ func (a *App) shutdown(ctx context.Context) {
 // listenForProgress listens for progress events and emits them to the frontend
 func (a *App) listenForProgress() {
 	for event := range a.progressChan {
-		runtime.EventsEmit(a.ctx, "progress", map[string]interface{}{
+		runtime.EventsEmit(a.ctx, "progress", map[string]any{
 			"stage":   event.Stage,
 			"current": event.Current,
 			"total":   event.Total,
@@ -123,13 +126,15 @@ func (a *App) Backup(opts BackupOptions) error {
 
 // RestoreOptions holds options for the Restore operation
 type RestoreOptions struct {
-	Bucket    string `json:"bucket"`
-	TargetDir string `json:"targetDir"`
+	Bucket     string `json:"bucket"`
+	TargetDir  string `json:"targetDir"`
+	FromFilter string `json:"fromFilter"`
+	ToFilter   string `json:"toFilter"`
 }
 
 // Restore downloads and extracts archives from S3
 func (a *App) Restore(opts RestoreOptions) error {
-	logger.Info("Starting restore operation", "bucket", opts.Bucket, "target", opts.TargetDir)
+	logger.Info("Starting restore operation", "bucket", opts.Bucket, "target", opts.TargetDir, "from", opts.FromFilter, "to", opts.ToFilter)
 
 	backup, err := pics.NewS3Backup(a.ctx)
 	if err != nil {
@@ -137,8 +142,25 @@ func (a *App) Restore(opts RestoreOptions) error {
 		return err
 	}
 
-	// Use empty filter to restore all directories
+	// Parse filter
 	filter := pics.RestoreFilter{}
+	if opts.FromFilter != "" {
+		year, month, err := parseYearMonth(opts.FromFilter)
+		if err != nil {
+			return fmt.Errorf("invalid FROM filter (expected YYYY or MM/YYYY): %w", err)
+		}
+		filter.FromYear = year
+		filter.FromMonth = month
+	}
+	if opts.ToFilter != "" {
+		year, month, err := parseYearMonth(opts.ToFilter)
+		if err != nil {
+			return fmt.Errorf("invalid TO filter (expected YYYY or MM/YYYY): %w", err)
+		}
+		filter.ToYear = year
+		filter.ToMonth = month
+	}
+
 	if err := backup.RestoreDirectories(a.ctx, opts.Bucket, opts.TargetDir, filter, 10, a.progressChan); err != nil {
 		logger.Error("Restore operation failed", "error", err)
 		return err
@@ -182,4 +204,32 @@ func (a *App) SelectDirectory() (string, error) {
 // GetVersion returns the application version
 func (a *App) GetVersion() string {
 	return version
+}
+
+// parseYearMonth parses a date string in format "YYYY" or "MM/YYYY".
+// Returns (year, month, error). Month is 0 if not specified.
+func parseYearMonth(s string) (int, int, error) {
+	parts := strings.Split(s, "/")
+
+	if len(parts) == 1 {
+		// Format: YYYY
+		year, err := strconv.Atoi(parts[0])
+		if err != nil || year < 1000 || year > 9999 {
+			return 0, 0, fmt.Errorf("invalid year: %s", parts[0])
+		}
+		return year, 0, nil
+	} else if len(parts) == 2 {
+		// Format: MM/YYYY
+		month, err := strconv.Atoi(parts[0])
+		if err != nil || month < 1 || month > 12 {
+			return 0, 0, fmt.Errorf("invalid month (must be 1-12): %s", parts[0])
+		}
+		year, err := strconv.Atoi(parts[1])
+		if err != nil || year < 1000 || year > 9999 {
+			return 0, 0, fmt.Errorf("invalid year: %s", parts[1])
+		}
+		return year, month, nil
+	}
+
+	return 0, 0, fmt.Errorf("invalid format (expected YYYY or MM/YYYY): %s", s)
 }

@@ -11,8 +11,39 @@ JPEGOPTIM_VERSION=1.5.6
 GORELEASER := go run github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 WAILS := go run github.com/wailsapp/wails/v2/cmd/wails@$(WAILS_VERSION)
 
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  make build         - Build CLI application"
+	@echo "  make build-cli     - Build CLI application"
+	@echo "  make build-ui      - Build UI application (downloads binaries if needed)"
+	@echo "  make clean         - Clean all build artifacts and temporary files"
+	@echo "  make test          - Run tests"
+	@echo ""
+	@echo "Binary downloads (automatic):"
+	@echo "  make apps/ui/build/resources/linux/exiftool"
+	@echo "  make apps/ui/build/resources/linux/jpegoptim"
+	@echo "  (darwin and windows variants also available)"
+
 .PHONY: build
 build: build-cli
+
+.PHONY: clean
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -f $(BINARY_NAME_CLI)
+	rm -f $(BINARY_NAME_UI)
+	rm -rf apps/ui/build/bin
+	rm -rf dist/
+	@echo "Cleaning downloaded binaries..."
+	rm -rf apps/ui/build/resources
+	@echo "Cleaning runtime extracted binaries..."
+	rm -rf /tmp/pics-ui-tools
+	@echo "Cleaning temporary directories..."
+	rm -rf /tmp/pics-*
+	@echo "✓ Clean complete"
 
 .PHONY: build-cli
 build-cli:
@@ -52,12 +83,6 @@ tidy:
 	cd apps/cli && go mod tidy
 	cd apps/ui && go mod tidy
 
-.PHONY: clean
-clean:
-	rm -f $(BINARY_NAME_CLI)
-	rm -rf apps/ui/build
-	rm -rf dist/
-
 # Windows binaries
 apps/ui/build/resources/windows/exiftool.exe:
 	@echo "Downloading exiftool for Windows..."
@@ -92,6 +117,7 @@ apps/ui/build/resources/darwin/exiftool:
 		curl -L -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
+		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/darwin/ && \
 		cp Image-ExifTool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/darwin/exiftool && \
 		chmod +x $(CURDIR)/apps/ui/build/resources/darwin/exiftool && \
 		cd /tmp && rm -rf $$TMPDIR
@@ -119,6 +145,7 @@ apps/ui/build/resources/linux/exiftool:
 		curl -L -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
+		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/linux/ && \
 		cp Image-ExifTool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/linux/exiftool && \
 		chmod +x $(CURDIR)/apps/ui/build/resources/linux/exiftool && \
 		cd /tmp && rm -rf $$TMPDIR

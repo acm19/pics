@@ -44,10 +44,13 @@ func NewFileOrganiserWithPaths(exiftoolPath string) FileOrganiser {
 
 // OrganiseByDate moves files to date-based directories
 func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan chan<- ProgressEvent) error {
+	logger.Info("OrganiseByDate started", "sourceDir", sourceDir, "targetDir", targetDir)
+
 	entries, err := os.ReadDir(sourceDir)
 	if err != nil {
 		return err
 	}
+	logger.Info("Directory read complete", "entries", len(entries))
 
 	// Count total files
 	totalFiles := 0
@@ -56,6 +59,7 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan
 			totalFiles++
 		}
 	}
+	logger.Debug("Counted files", "totalFiles", totalFiles)
 
 	current := 0
 	for _, entry := range entries {
@@ -81,10 +85,13 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan
 		}
 
 		// Get file date from EXIF if available, otherwise use ModTime
+		logger.Debug("Extracting date", "file", entry.Name(), "current", current, "total", totalFiles)
 		fileDate, err := o.dateExtractor.GetFileDate(filePath)
 		if err != nil {
+			logger.Error("Failed to get file date", "file", entry.Name(), "error", err)
 			return err
 		}
+		logger.Debug("Date extracted", "file", entry.Name(), "date", fileDate)
 
 		dirName := fileDate.Format("2006 01 January 02")
 		destDir := filepath.Join(targetDir, dirName)

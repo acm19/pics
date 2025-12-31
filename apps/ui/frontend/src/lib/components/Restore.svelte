@@ -4,12 +4,42 @@
 
   let bucket = '';
   let targetDir = '';
+  let fromYear = '';
+  let fromMonth = '';
+  let toYear = '';
+  let toMonth = '';
   let isProcessing = false;
   let progress = { stage: '', current: 0, total: 0, message: '', file: '' };
   let error = '';
   let success = false;
 
   let SelectDirectory, Restore;
+
+  // Generate year options (current year - 10 to current year + 1)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 12 }, (_, i) => currentYear - 10 + i);
+  const months = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ];
+
+  // Build filter strings from selectors
+  $: fromFilter = fromYear ? (fromMonth ? `${fromMonth}/${fromYear}` : `${fromYear}`) : '';
+  $: toFilter = toYear ? (toMonth ? `${toMonth}/${toYear}` : `${toYear}`) : '';
+
+  // Clear month when year is cleared
+  $: if (!fromYear) fromMonth = '';
+  $: if (!toYear) toMonth = '';
 
   onMount(async () => {
     try {
@@ -46,7 +76,7 @@
     progress = { stage: '', current: 0, total: 0, message: '', file: '' };
 
     try {
-      await Restore({ bucket, targetDir });
+      await Restore({ bucket, targetDir, fromFilter, toFilter });
       success = true;
       progress = { stage: 'completed', current: 0, total: 0, message: 'Restore completed successfully!', file: '' };
     } catch (err) {
@@ -79,6 +109,44 @@
       </div>
     </div>
 
+    <div class="form-group">
+      <label>From (optional)</label>
+      <div class="date-filter">
+        <select bind:value={fromYear} disabled={isProcessing}>
+          <option value="">Any year</option>
+          {#each years as year}
+            <option value={year}>{year}</option>
+          {/each}
+        </select>
+        <select bind:value={fromMonth} disabled={isProcessing || !fromYear}>
+          <option value="">All months</option>
+          {#each months as month}
+            <option value={month.value}>{month.label}</option>
+          {/each}
+        </select>
+      </div>
+      <small>Leave empty to restore from the beginning</small>
+    </div>
+
+    <div class="form-group">
+      <label>To (optional)</label>
+      <div class="date-filter">
+        <select bind:value={toYear} disabled={isProcessing}>
+          <option value="">Any year</option>
+          {#each years as year}
+            <option value={year}>{year}</option>
+          {/each}
+        </select>
+        <select bind:value={toMonth} disabled={isProcessing || !toYear}>
+          <option value="">All months</option>
+          {#each months as month}
+            <option value={month.value}>{month.label}</option>
+          {/each}
+        </select>
+      </div>
+      <small>Leave empty to restore until the end</small>
+    </div>
+
     <button class="btn-primary" on:click={startRestore} disabled={isProcessing || !bucket || !targetDir}>
       {isProcessing ? 'Restoring...' : 'Start Restore'}
     </button>
@@ -97,9 +165,8 @@
       </div>
       {#if progress.total > 0}
         <div class="progress-bar">
-          <div class="progress-bar-fill" style="width: {progressPercent}%">
-            {progressPercent}%
-          </div>
+          <div class="progress-bar-fill" style="width: {progressPercent}%"></div>
+          <div class="progress-bar-text">{progressPercent}%</div>
         </div>
       {/if}
     </div>
@@ -207,5 +274,21 @@
     background-color: rgba(76, 175, 80, 0.1);
     border: 1px solid var(--success);
     color: var(--success);
+  }
+
+  small {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .date-filter {
+    display: flex;
+    gap: 8px;
+  }
+
+  .date-filter select {
+    flex: 1;
   }
 </style>
