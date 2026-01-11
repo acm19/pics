@@ -20,8 +20,9 @@ type FileRenamer interface {
 	// RenameFilesWithPattern renames files in a directory based on a filter and naming pattern.
 	//
 	// Files are renamed in place with sequential numbering: {baseName}_00001.ext, {baseName}_00002.ext, etc.
-	// Only files matching the filter are renamed. Files are sorted by date (EXIF or modification time) before
-	// renaming to ensure chronological ordering. File extensions are normalised to lowercase.
+	// Only files matching the filter are renamed. Files are sorted by date (EXIF or modification time) first,
+	// then by filename if dates are equal, to ensure consistent chronological ordering. File extensions are
+	// normalised to lowercase.
 	//
 	// Parameters:
 	//   - dir: The directory containing files to rename
@@ -38,7 +39,8 @@ type FileRenamer interface {
 	//
 	// Files matching the filter are moved from sourceDir to targetDir and renamed with the pattern
 	// {baseName}_00001.ext, {baseName}_00002.ext, etc. Files are sorted by date (EXIF or modification time)
-	// before processing to ensure chronological ordering. File extensions are normalised to lowercase.
+	// first, then by filename if dates are equal, to ensure consistent chronological ordering. File extensions
+	// are normalised to lowercase.
 	//
 	// The target directory is created only if there are files to move. If no files match the filter,
 	// the target directory is not created and the method returns successfully.
@@ -124,8 +126,12 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 		}
 	}
 
-	// Sort files by date (oldest first)
+	// Sort files by date (oldest first), then by filename if dates are equal
 	sort.Slice(filesWithDates, func(i, j int) bool {
+		if filesWithDates[i].date.Equal(filesWithDates[j].date) {
+			// If dates are equal, sort by filename
+			return filesWithDates[i].path < filesWithDates[j].path
+		}
 		return filesWithDates[i].date.Before(filesWithDates[j].date)
 	})
 

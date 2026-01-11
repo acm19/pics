@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestFileRenamer_RenameFilesWithPattern(t *testing.T) {
@@ -341,4 +342,44 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_CreatesTargetOnlyWhenNeeded(t
 
 	// Non-matching file should remain in source
 	assertFileExists(t, filepath.Join(sourceDir, "document.txt"))
+}
+
+func TestFileRenamer_SortByDateThenFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	testDir := filepath.Join(tmpDir, "test")
+	if err := os.MkdirAll(testDir, 0755); err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+
+	// Create files with same date but different names
+	sameDate := parseTime(t, "2023-06-15T10:00:00Z")
+	createFileWithDate(t, testDir, "photo_c.jpg", sameDate)
+	createFileWithDate(t, testDir, "photo_a.jpg", sameDate)
+	createFileWithDate(t, testDir, "photo_b.jpg", sameDate)
+
+	renamer := NewFileRenamer(createTestExiftool(t))
+	ext := NewExtensions()
+	count, err := renamer.RenameFilesWithPattern(testDir, "sorted", ext.IsImage, nil)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if count != 3 {
+		t.Errorf("Expected 3 files renamed, got: %d", count)
+	}
+
+	// Files with same date should be sorted alphabetically by filename
+	assertFileExists(t, filepath.Join(testDir, "sorted_00001.jpg")) // photo_a
+	assertFileExists(t, filepath.Join(testDir, "sorted_00002.jpg")) // photo_b
+	assertFileExists(t, filepath.Join(testDir, "sorted_00003.jpg")) // photo_c
+}
+
+func parseTime(t *testing.T, timeStr string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		t.Fatalf("Failed to parse time %s: %v", timeStr, err)
+	}
+	return parsed
 }
