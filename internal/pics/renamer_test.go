@@ -351,11 +351,11 @@ func TestFileRenamer_SortByDateThenFilename(t *testing.T) {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
-	// Create files with same date but different names
+	// Create valid JPEG files with same date but different names
 	sameDate := parseTime(t, "2023-06-15T10:00:00Z")
-	createFileWithDate(t, testDir, "photo_c.jpg", sameDate)
-	createFileWithDate(t, testDir, "photo_a.jpg", sameDate)
-	createFileWithDate(t, testDir, "photo_b.jpg", sameDate)
+	createValidJPEGWithDate(t, testDir, "photo_c.jpg", sameDate)
+	createValidJPEGWithDate(t, testDir, "photo_a.jpg", sameDate)
+	createValidJPEGWithDate(t, testDir, "photo_b.jpg", sameDate)
 
 	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()

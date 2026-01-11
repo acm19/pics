@@ -24,6 +24,9 @@ type FileRenamer interface {
 	// then by filename if dates are equal, to ensure consistent chronological ordering. File extensions are
 	// normalised to lowercase.
 	//
+	// Before renaming, the original filename is stored in the EXIF OriginalFileName field if it doesn't already
+	// exist. This allows tracking of the original filename through subsequent renames.
+	//
 	// Parameters:
 	//   - dir: The directory containing files to rename
 	//   - baseName: The base name to use for renamed files (e.g., "vacation" produces "vacation_00001.jpg")
@@ -41,6 +44,9 @@ type FileRenamer interface {
 	// {baseName}_00001.ext, {baseName}_00002.ext, etc. Files are sorted by date (EXIF or modification time)
 	// first, then by filename if dates are equal, to ensure consistent chronological ordering. File extensions
 	// are normalised to lowercase.
+	//
+	// Before renaming, the original filename is stored in the EXIF OriginalFileName field if it doesn't already
+	// exist. This allows tracking of the original filename through subsequent renames.
 	//
 	// The target directory is created only if there are files to move. If no files match the filter,
 	// the target directory is not created and the method returns successfully.
@@ -61,12 +67,14 @@ type FileRenamer interface {
 // fileRenamer implements the FileRenamer interface
 type fileRenamer struct {
 	dateExtractor *AggregatedFileDateExtractor
+	exifWriter    ExifWriter
 }
 
 // NewFileRenamer creates a new FileRenamer instance
 func NewFileRenamer(et *exiftool.Exiftool) FileRenamer {
 	return &fileRenamer{
 		dateExtractor: NewFileDateExtractor(et),
+		exifWriter:    NewExifWriter(et),
 	}
 }
 
@@ -151,6 +159,12 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 			default:
 				logger.Debug("Progress event dropped (channel full)", "stage", "renaming")
 			}
+		}
+
+		// Store original filename in EXIF if this is the first rename
+		if _, err := r.exifWriter.WriteOriginalFileNameIfMissing(fileData.path); err != nil {
+			logger.Warn("Failed to write OriginalFileName to EXIF", "file", fileData.path, "error", err)
+			// Continue with rename even if EXIF write fails
 		}
 
 		ext := strings.ToLower(filepath.Ext(fileData.path))
