@@ -19,6 +19,7 @@ help:
 	@echo "  make build         - Build CLI application"
 	@echo "  make build-cli     - Build CLI application"
 	@echo "  make build-ui      - Build UI application (downloads binaries if needed)"
+	@echo "  make local-install - Build and install CLI to ~/bin"
 	@echo "  make clean         - Clean all build artifacts and temporary files"
 	@echo "  make test          - Run tests"
 	@echo ""
@@ -48,6 +49,14 @@ clean:
 .PHONY: build-cli
 build-cli:
 	cd apps/cli && go build -ldflags="-s -w" -o ../../$(BINARY_NAME_CLI)
+
+.PHONY: local-install
+.SILENT: local-install
+local-install: build-cli
+	echo "Installing $(BINARY_NAME_CLI) to ~/bin..."
+	mkdir -p ~/bin
+	cp $(BINARY_NAME_CLI) ~/bin/$(BINARY_NAME_CLI)
+	echo "✓ Installed $(BINARY_NAME_CLI) to ~/bin/$(BINARY_NAME_CLI)"
 
 .PHONY: build-ui
 build-ui: \
