@@ -27,7 +27,7 @@ type extensions struct {
 // NewExtensions creates a new Extensions instance.
 func NewExtensions() Extensions {
 	return &extensions{
-		imageExts: []string{".jpg", ".jpeg", ".heic"},
+		imageExts: []string{".jpg", ".jpeg", ".heic", ".png"},
 		videoExts: []string{".mov", ".mp4"},
 	}
 }

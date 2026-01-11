@@ -18,7 +18,7 @@ func TestFileRenamer_RenameFilesWithPattern(t *testing.T) {
 	createFile(t, testDir, "image2.JPG")
 	createFile(t, testDir, "image3.JPEG")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
@@ -48,7 +48,7 @@ func TestFileRenamer_RenameFilesWithPattern_EmptyDirectory(t *testing.T) {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	count, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
@@ -72,7 +72,7 @@ func TestFileRenamer_RenameFilesWithPattern_NoMatchingFiles(t *testing.T) {
 	createFile(t, testDir, "document.txt")
 	createFile(t, testDir, "data.csv")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
@@ -99,7 +99,7 @@ func TestFileRenamer_RenameFilesWithPattern_SkipsDirectories(t *testing.T) {
 	}
 	createFile(t, testDir, "image1.jpg")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.RenameFilesWithPattern(testDir, "test_prefix", ext.IsImage, nil)
 
@@ -126,7 +126,7 @@ func TestFileRenamer_RenameFilesWithPattern_SortedOrder(t *testing.T) {
 	createFile(t, testDir, "a.jpg")
 	createFile(t, testDir, "m.jpg")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.RenameFilesWithPattern(testDir, "sorted", ext.IsImage, nil)
 
@@ -151,7 +151,7 @@ func TestFileRenamer_RenameFilesWithPattern_NormalisesExtensions(t *testing.T) {
 	createFile(t, testDir, "image1.JPG")
 	createFile(t, testDir, "image2.HEIC")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.RenameFilesWithPattern(testDir, "normalised", ext.IsImage, nil)
 
@@ -177,7 +177,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern(t *testing.T) {
 	createFile(t, sourceDir, "video1.mov")
 	createFile(t, sourceDir, "video2.MOV")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	count, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid_prefix", ext.IsVideo, nil)
 
@@ -214,7 +214,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NormalisesExtensions(t *testi
 	createFile(t, sourceDir, "video1.MP4")
 	createFile(t, sourceDir, "video2.MOV")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "video", ext.IsVideo, nil)
 
@@ -236,7 +236,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_EmptySource(t *testing.T) {
 		t.Fatalf("Failed to create source directory: %v", err)
 	}
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo, nil)
 
@@ -260,7 +260,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NoMatchingFiles(t *testing.T)
 	// Create non-video files
 	createFile(t, sourceDir, "document.txt")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "prefix", ext.IsVideo, nil)
 
@@ -287,7 +287,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_InPlace(t *testing.T) {
 	createFile(t, testDir, "vid1.mov")
 	createFile(t, testDir, "vid2.MOV")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	// Move to same directory (rename in place)
 	_, err := renamer.MoveAndRenameFilesWithPattern(testDir, testDir, "video", ext.IsVideo, nil)
@@ -305,7 +305,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_NonexistentSource(t *testing.
 	tmpDir := t.TempDir()
 	targetDir := filepath.Join(tmpDir, "target")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.MoveAndRenameFilesWithPattern("/nonexistent/source", targetDir, "prefix", ext.IsImage, nil)
 
@@ -327,7 +327,7 @@ func TestFileRenamer_MoveAndRenameFilesWithPattern_CreatesTargetOnlyWhenNeeded(t
 	createFile(t, sourceDir, "video.mov")
 	createFile(t, sourceDir, "document.txt")
 
-	renamer := NewFileRenamer()
+	renamer := NewFileRenamer(createTestExiftool(t))
 	ext := NewExtensions()
 	_, err := renamer.MoveAndRenameFilesWithPattern(sourceDir, targetDir, "vid", ext.IsVideo, nil)
 

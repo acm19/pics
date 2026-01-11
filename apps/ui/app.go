@@ -8,6 +8,7 @@ import (
 
 	"github.com/acm19/pics/internal/logger"
 	"github.com/acm19/pics/internal/pics"
+	"github.com/barasher/go-exiftool"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -17,14 +18,30 @@ type App struct {
 	exiftoolPath   string
 	jpegoptimPath  string
 	progressChan   chan pics.ProgressEvent
+	exiftool       *exiftool.Exiftool
+	renamer        pics.DirectoryRenamer
 }
 
 // NewApp creates a new App application struct
 func NewApp(exiftoolPath, jpegoptimPath string) *App {
+	// Initialise single exiftool instance for reuse
+	et, err := exiftool.NewExiftool(exiftool.SetExiftoolBinaryPath(exiftoolPath))
+	if err != nil {
+		logger.Error("Failed to initialise exiftool", "error", err)
+		// Create app without exiftool - will fail later if needed
+		return &App{
+			exiftoolPath:  exiftoolPath,
+			jpegoptimPath: jpegoptimPath,
+			progressChan:  make(chan pics.ProgressEvent, 100),
+		}
+	}
+
 	return &App{
 		exiftoolPath:  exiftoolPath,
 		jpegoptimPath: jpegoptimPath,
 		progressChan:  make(chan pics.ProgressEvent, 100),
+		exiftool:      et,
+		renamer:       pics.NewDirectoryRenamer(et),
 	}
 }
 
@@ -46,6 +63,9 @@ func (a *App) domReady(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	logger.Info("Application shutting down")
 	close(a.progressChan)
+	if a.exiftool != nil {
+		a.exiftool.Close()
+	}
 }
 
 // listenForProgress listens for progress events and emits them to the frontend
@@ -74,11 +94,11 @@ type ParseOptions struct {
 func (a *App) Parse(opts ParseOptions) error {
 	logger.Info("Starting parse operation", "source", opts.SourceDir, "target", opts.TargetDir)
 
-	// Create file organiser with custom binary paths
-	organiser := pics.NewFileOrganiserWithPaths(a.exiftoolPath)
+	// Create file organiser with shared exiftool instance
+	organiser := pics.NewFileOrganiser(a.exiftool)
 
-	// Create media parser with custom binary paths
-	parser := pics.NewMediaParserWithPaths(a.jpegoptimPath, organiser)
+	// Create media parser with custom binary paths and organiser
+	parser := pics.NewMediaParser(a.jpegoptimPath, organiser)
 
 	// Create parse options with progress channel
 	parseOpts := pics.ParseOptions{
@@ -180,8 +200,7 @@ type RenameOptions struct {
 func (a *App) Rename(opts RenameOptions) error {
 	logger.Info("Starting rename operation", "directory", opts.Directory, "newName", opts.NewName)
 
-	renamer := pics.NewDirectoryRenamer()
-	if err := renamer.RenameDirectory(opts.Directory, opts.NewName); err != nil {
+	if err := a.renamer.RenameDirectory(opts.Directory, opts.NewName); err != nil {
 		logger.Error("Rename operation failed", "error", err)
 		return err
 	}

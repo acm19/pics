@@ -15,8 +15,11 @@ var testParseOptions = ParseOptions{
 	MaxConcurrency: 100,
 }
 
-// Test-level parser instance used across all tests
-var testParser = NewMediaParser()
+func createTestParser(t *testing.T) MediaParser {
+	t.Helper()
+	organiser := NewFileOrganiser(createTestExiftool(t))
+	return NewMediaParser("", organiser)
+}
 
 // Helper functions
 
@@ -92,13 +95,13 @@ func TestMediaParser_Parse(t *testing.T) {
 	createMediaFile(t, sourceDir, "video1.mov", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// Check that files were organized into date-based directory
+	// Check that files were organised into date-based directory
 	expectedDir := filepath.Join(targetDir, "2023 06 June 15")
 	assertMediaFileExists(t, expectedDir)
 
@@ -117,7 +120,7 @@ func TestMediaParser_Parse_EmptySource(t *testing.T) {
 	sourceDir, targetDir := createSourceAndTarget(t, tmpDir)
 
 	// Parse with no files in source
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error for empty source, got: %v", err)
@@ -136,7 +139,7 @@ func TestMediaParser_Parse_MultipleDates(t *testing.T) {
 	createMediaFile(t, sourceDir, "july.jpg", date2)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -160,7 +163,7 @@ func TestMediaParser_Parse_WithSubdirectories(t *testing.T) {
 	createMediaFile(t, subdir2, "image2.jpeg", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -199,7 +202,7 @@ func TestMediaParser_Parse_SkipsDotFiles(t *testing.T) {
 	createMediaFile(t, sourceDir, ".hidden.jpg", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -237,7 +240,7 @@ func TestMediaParser_Parse_SkipsDotDirectories(t *testing.T) {
 	createMediaFile(t, dotSubdir, "image2.jpg", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -274,7 +277,7 @@ func TestMediaParser_Parse_MixedFileTypes(t *testing.T) {
 	createMediaFile(t, sourceDir, "video.mov", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -301,7 +304,7 @@ func TestMediaParser_Parse_IgnoresUnsupportedFiles(t *testing.T) {
 	createMediaFile(t, sourceDir, "video.avi", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -327,7 +330,7 @@ func TestMediaParser_Parse_MP4Videos(t *testing.T) {
 	createMediaFile(t, sourceDir, "video2.MP4", testDate)
 
 	// Parse files
-	err := testParser.Parse(sourceDir, targetDir, testParseOptions)
+	err := createTestParser(t).Parse(sourceDir, targetDir, testParseOptions)
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -462,7 +465,7 @@ func TestMediaParser_ParseWithProgressChannel(t *testing.T) {
 	// Run parse in goroutine so we can read from channel
 	done := make(chan error)
 	go func() {
-		done <- testParser.Parse(sourceDir, targetDir, opts)
+		done <- createTestParser(t).Parse(sourceDir, targetDir, opts)
 	}()
 
 	// Collect progress events

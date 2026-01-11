@@ -11,16 +11,22 @@ import (
 type FileStats interface {
 	// ValidateDirectories checks if source and target directories exist
 	ValidateDirectories(sourceDir, targetDir string) error
-	// GetFileCount returns the number of files in a directory recursively
+	// GetFileCount returns the number of supported media files in a directory recursively
 	GetFileCount(dir string) (int, error)
+	// GetUnsupportedFiles returns a list of unsupported files in a directory recursively
+	GetUnsupportedFiles(dir string) ([]string, error)
 }
 
 // fileStats implements the FileStats interface
-type fileStats struct{}
+type fileStats struct {
+	extensions Extensions
+}
 
 // NewFileStats creates a new FileStats instance
 func NewFileStats() FileStats {
-	return &fileStats{}
+	return &fileStats{
+		extensions: NewExtensions(),
+	}
 }
 
 // ValidateDirectories checks if source and target directories exist
@@ -34,7 +40,7 @@ func (f *fileStats) ValidateDirectories(sourceDir, targetDir string) error {
 	return nil
 }
 
-// GetFileCount counts all non-directory files in a directory tree, excluding dot files
+// GetFileCount counts all supported media files in a directory tree, excluding dot files
 func (f *fileStats) GetFileCount(dir string) (int, error) {
 	count := 0
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -50,10 +56,34 @@ func (f *fileStats) GetFileCount(dir string) (int, error) {
 			return nil
 		}
 
-		if !info.IsDir() {
+		if !info.IsDir() && f.extensions.IsSupported(path) {
 			count++
 		}
 		return nil
 	})
 	return count, err
+}
+
+// GetUnsupportedFiles returns a list of unsupported files in a directory tree, excluding dot files
+func (f *fileStats) GetUnsupportedFiles(dir string) ([]string, error) {
+	var unsupported []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip dot files and dot directories
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if !info.IsDir() && !f.extensions.IsSupported(path) {
+			unsupported = append(unsupported, path)
+		}
+		return nil
+	})
+	return unsupported, err
 }

@@ -121,9 +121,9 @@ func TestFileStats_GetFileCount(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// Should count all 5 files
-	if count != 5 {
-		t.Errorf("Expected count 5, got %d", count)
+	// Should count only 3 supported media files (ignoring .txt files)
+	if count != 3 {
+		t.Errorf("Expected count 3, got %d", count)
 	}
 }
 
@@ -174,9 +174,9 @@ func TestFileStats_GetFileCount_SkipsDotFiles(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// Should count only 2 regular files, skipping dot files and dot directories
-	if count != 2 {
-		t.Errorf("Expected count 2, got %d", count)
+	// Should count only 1 supported media file (file2.jpg), skipping dot files and unsupported formats
+	if count != 1 {
+		t.Errorf("Expected count 1, got %d", count)
 	}
 }
 
@@ -204,9 +204,9 @@ func TestFileStats_GetFileCount_NestedDirectories(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// Should count all 6 files across all levels
-	if count != 6 {
-		t.Errorf("Expected count 6, got %d", count)
+	// Should count 0 files - all are unsupported .txt files
+	if count != 0 {
+		t.Errorf("Expected count 0, got %d", count)
 	}
 }
 

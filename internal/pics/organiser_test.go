@@ -73,7 +73,7 @@ func TestFileOrganiser_OrganiseByDate(t *testing.T) {
 	file2 := createFileWithDate(t, sourceDir, "image2.jpeg", testDate)
 
 	// Organise files by date
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
@@ -102,7 +102,7 @@ func TestFileOrganiser_OrganiseByDate_MultipleDates(t *testing.T) {
 	createFileWithDate(t, sourceDir, "june.jpg", date1)
 	createFileWithDate(t, sourceDir, "july.jpg", date2)
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
@@ -128,7 +128,7 @@ func TestFileOrganiser_OrganiseByDate_SkipsDirectories(t *testing.T) {
 	testDate := time.Date(2023, 6, 15, 10, 30, 0, 0, time.UTC)
 	createFileWithDate(t, sourceDir, "image1.jpg", testDate)
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseByDate(sourceDir, targetDir, nil)
 
 	if err != nil {
@@ -146,7 +146,7 @@ func TestFileOrganiser_OrganiseByDate_NonexistentSource(t *testing.T) {
 	tmpDir := t.TempDir()
 	targetDir := filepath.Join(tmpDir, "target")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseByDate("/nonexistent/source", targetDir, nil)
 
 	if err == nil {
@@ -166,7 +166,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages(t *testing.T) {
 	createFile(t, dateDir, "vid2.MOV")
 
 	// Organise videos and rename images
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -197,7 +197,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_OnlyImages(t *testing.T) {
 	createFile(t, dateDir, "img1.jpg")
 	createFile(t, dateDir, "img2.jpeg")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -220,7 +220,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_OnlyVideos(t *testing.T) {
 	// Create only videos
 	createFile(t, dateDir, "vid1.mov")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -240,7 +240,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_EmptyDirectory(t *testing.T
 	// Create an empty date-based directory
 	dateDir := createDateDir(t, targetDir, "2023 06 June 15")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -261,7 +261,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_InvalidDirectoryFormat(t *t
 	// Create a file in the invalid directory
 	createFile(t, invalidDir, "img.jpg")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err == nil {
@@ -280,7 +280,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_SkipsFiles(t *testing.T) {
 	// Create an image in the date directory
 	createFile(t, dateDir, "img1.jpg")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -295,7 +295,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_SkipsFiles(t *testing.T) {
 }
 
 func TestFileOrganiser_OrganiseVideosAndRenameImages_NonexistentTarget(t *testing.T) {
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages("/nonexistent/target", nil)
 
 	if err == nil {
@@ -315,7 +315,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_NormalisesExtensions(t *tes
 	// Create video with uppercase extension
 	createFile(t, dateDir, "vid1.MOV")
 
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {
@@ -342,7 +342,7 @@ func TestFileOrganiser_OrganiseVideosAndRenameImages_MP4Videos(t *testing.T) {
 	createFile(t, dateDir, "vid2.MP4")
 
 	// Organise videos and rename images
-	organiser := NewFileOrganiser()
+	organiser := NewFileOrganiser(createTestExiftool(t))
 	err := organiser.OrganiseVideosAndRenameImages(targetDir, nil)
 
 	if err != nil {

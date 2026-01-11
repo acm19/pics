@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/acm19/pics/internal/logger"
+	"github.com/barasher/go-exiftool"
 )
 
 // FileOrganiser defines the interface for organising files
@@ -25,20 +26,11 @@ type fileOrganiser struct {
 }
 
 // NewFileOrganiser creates a new FileOrganiser instance
-func NewFileOrganiser() FileOrganiser {
+func NewFileOrganiser(et *exiftool.Exiftool) FileOrganiser {
 	return &fileOrganiser{
-		dateExtractor: NewFileDateExtractor(),
+		dateExtractor: NewFileDateExtractor(et),
 		extensions:    NewExtensions(),
-		fileRenamer:   NewFileRenamer(),
-	}
-}
-
-// NewFileOrganiserWithPaths creates a new FileOrganiser with custom binary paths
-func NewFileOrganiserWithPaths(exiftoolPath string) FileOrganiser {
-	return &fileOrganiser{
-		dateExtractor: NewFileDateExtractorWithPath(exiftoolPath),
-		extensions:    NewExtensions(),
-		fileRenamer:   NewFileRenamer(),
+		fileRenamer:   NewFileRenamer(et),
 	}
 }
 

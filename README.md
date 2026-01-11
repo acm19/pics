@@ -23,7 +23,7 @@ For maintainers: see [RELEASING.md](RELEASING.md) for the release process.
 ## Requirements
 
 - Go 1.24 or later.
-- `exiftool` - for reading EXIF metadata to organize files by photo creation date (optional, falls back to file modification time if not installed).
+- `exiftool` - for reading EXIF metadata to organise files by photo creation date (optional, falls back to file modification time if not installed).
 - `jpegoptim` - for JPEG compression with EXIF preservation.
 - AWS credentials configured (for S3 backup feature) - via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or `~/.aws/credentials` file.
 
@@ -49,7 +49,7 @@ sudo dnf install perl-Image-ExifTool
 sudo pacman -S perl-image-exiftool
 ```
 
-**Note:** If ExifTool is not installed, the application will automatically fall back to using file modification times for organizing photos.
+**Note:** If ExifTool is not installed, the application will automatically fall back to using file modification times for organising photos.
 
 ### Installing jpegoptim
 

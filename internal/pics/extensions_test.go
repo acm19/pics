@@ -17,12 +17,14 @@ func TestExtensions_IsImage(t *testing.T) {
 		{"photo.JPEG", true},
 		{"photo.heic", true},
 		{"photo.HEIC", true},
+		{"photo.png", true},
+		{"photo.PNG", true},
 		{"video.mov", false},
 		{"video.mp4", false},
 		{"document.txt", false},
-		{"file.png", false},
 		{"/path/to/image.jpg", true},
 		{"/path/to/image.HEIC", true},
+		{"/path/to/image.png", true},
 	}
 
 	for _, tt := range tests {
@@ -71,16 +73,18 @@ func TestExtensions_IsSupported(t *testing.T) {
 		{"photo.jpg", true},
 		{"photo.JPEG", true},
 		{"photo.heic", true},
+		{"photo.png", true},
+		{"photo.PNG", true},
 		// Videos
 		{"video.mov", true},
 		{"video.mp4", true},
 		{"video.MP4", true},
 		// Unsupported
 		{"document.txt", false},
-		{"file.png", false},
 		{"file.avi", false},
 		{"file.gif", false},
 		{"/path/to/supported.jpg", true},
+		{"/path/to/supported.png", true},
 		{"/path/to/unsupported.pdf", false},
 	}
 

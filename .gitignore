@@ -15,3 +15,7 @@ apps/ui/build/
 apps/ui/frontend/node_modules/
 apps/ui/frontend/dist/
 apps/ui/frontend/src/lib/wailsjs/
+
+# Claude files
+.claude/
+CLAUDE.md

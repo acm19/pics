@@ -38,16 +38,12 @@ func (e *modTimeExtractor) getFileDate(filePath string) (time.Time, error) {
 
 // exifDateExtractor extracts date from EXIF metadata
 type exifDateExtractor struct {
-	exiftoolPath string
+	et *exiftool.Exiftool
 }
 
-func newExifDateExtractor() *exifDateExtractor {
-	return &exifDateExtractor{}
-}
-
-func newExifDateExtractorWithPath(exiftoolPath string) *exifDateExtractor {
+func newExifDateExtractor(et *exiftool.Exiftool) *exifDateExtractor {
 	return &exifDateExtractor{
-		exiftoolPath: exiftoolPath,
+		et: et,
 	}
 }
 
@@ -56,22 +52,11 @@ func (e *exifDateExtractor) name() string {
 }
 
 func (e *exifDateExtractor) getFileDate(filePath string) (time.Time, error) {
-	var et *exiftool.Exiftool
-	var err error
-
-	// Use custom exiftool path if provided
-	if e.exiftoolPath != "" {
-		et, err = exiftool.NewExiftool(exiftool.SetExiftoolBinaryPath(e.exiftoolPath))
-	} else {
-		et, err = exiftool.NewExiftool()
+	if e.et == nil {
+		return time.Time{}, fmt.Errorf("exiftool not initialised")
 	}
 
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer et.Close()
-
-	fileInfos := et.ExtractMetadata(filePath)
+	fileInfos := e.et.ExtractMetadata(filePath)
 	if len(fileInfos) == 0 {
 		return time.Time{}, fmt.Errorf("no metadata found")
 	}
@@ -115,20 +100,10 @@ type AggregatedFileDateExtractor struct {
 //     this field.
 //   - CreateDate: holds the date when the image/video was created.
 //   - ModTime: if nothing else works falls back to modification time.
-func NewFileDateExtractor() *AggregatedFileDateExtractor {
+func NewFileDateExtractor(et *exiftool.Exiftool) *AggregatedFileDateExtractor {
 	return &AggregatedFileDateExtractor{
 		extractors: []fileDateExtractor{
-			newExifDateExtractor(),
-			newModTimeExtractor(),
-		},
-	}
-}
-
-// NewFileDateExtractorWithPath creates a new AggregatedFileDateExtractor with a custom exiftool path
-func NewFileDateExtractorWithPath(exiftoolPath string) *AggregatedFileDateExtractor {
-	return &AggregatedFileDateExtractor{
-		extractors: []fileDateExtractor{
-			newExifDateExtractorWithPath(exiftoolPath),
+			newExifDateExtractor(et),
 			newModTimeExtractor(),
 		},
 	}

@@ -24,23 +24,16 @@ type mediaParser struct {
 	compressor ImageCompressor
 	organiser  FileOrganiser
 	extensions Extensions
+	stats      FileStats
 }
 
-// NewMediaParser creates a new MediaParser instance
-func NewMediaParser() MediaParser {
-	return &mediaParser{
-		compressor: NewImageCompressor(),
-		organiser:  NewFileOrganiser(),
-		extensions: NewExtensions(),
-	}
-}
-
-// NewMediaParserWithPaths creates a new MediaParser with custom binary paths
-func NewMediaParserWithPaths(jpegoptimPath string, organiser FileOrganiser) MediaParser {
+// NewMediaParser creates a new MediaParser with custom binary paths and shared exiftool instance
+func NewMediaParser(jpegoptimPath string, organiser FileOrganiser) MediaParser {
 	return &mediaParser{
 		compressor: NewImageCompressorWithPath(jpegoptimPath),
 		organiser:  organiser,
 		extensions: NewExtensions(),
+		stats:      NewFileStats(),
 	}
 }
 
@@ -85,39 +78,27 @@ type fileToProcess struct {
 	isJPEG   bool
 }
 
-// countFiles counts the total number of supported files in the source directory
-func (p *mediaParser) countFiles(sourceDir string) (int, error) {
-	count := 0
-	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip dot files and dot directories
-		if strings.HasPrefix(info.Name(), ".") {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !info.IsDir() && p.extensions.IsSupported(path) {
-			count++
-		}
-		return nil
-	})
-	return count, err
-}
-
 // copyAndCompressFiles copies and optionally compresses files in parallel using a worker pool
 func (p *mediaParser) copyAndCompressFiles(sourceDir, tmpTarget string, opts ParseOptions) error {
 	// Count total files upfront for accurate progress reporting
 	logger.Info("Counting files", "source", sourceDir)
-	totalFiles, err := p.countFiles(sourceDir)
+	totalFiles, err := p.stats.GetFileCount(sourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to count files: %w", err)
 	}
 	logger.Info("File count complete", "total", totalFiles)
+
+	// List unsupported files that will be ignored
+	unsupportedFiles, err := p.stats.GetUnsupportedFiles(sourceDir)
+	if err != nil {
+		return fmt.Errorf("failed to get unsupported files: %w", err)
+	}
+	if len(unsupportedFiles) > 0 {
+		logger.Info("The following files will be ignored (unsupported formats)", "count", len(unsupportedFiles))
+		for _, file := range unsupportedFiles {
+			logger.Info("  - " + file)
+		}
+	}
 
 	// Determine number of workers
 	numWorkers := opts.MaxConcurrency

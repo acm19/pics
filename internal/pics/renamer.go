@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/acm19/pics/internal/logger"
+	"github.com/barasher/go-exiftool"
 )
 
 // fileFilter is a function that determines if a file should be renamed
@@ -18,8 +20,8 @@ type FileRenamer interface {
 	// RenameFilesWithPattern renames files in a directory based on a filter and naming pattern.
 	//
 	// Files are renamed in place with sequential numbering: {baseName}_00001.ext, {baseName}_00002.ext, etc.
-	// Only files matching the filter are renamed. Files are sorted alphabetically before renaming to ensure
-	// consistent ordering. File extensions are normalised to lowercase.
+	// Only files matching the filter are renamed. Files are sorted by date (EXIF or modification time) before
+	// renaming to ensure chronological ordering. File extensions are normalised to lowercase.
 	//
 	// Parameters:
 	//   - dir: The directory containing files to rename
@@ -35,8 +37,8 @@ type FileRenamer interface {
 	// MoveAndRenameFilesWithPattern moves files to a target directory and renames them with sequential numbering.
 	//
 	// Files matching the filter are moved from sourceDir to targetDir and renamed with the pattern
-	// {baseName}_00001.ext, {baseName}_00002.ext, etc. Files are sorted alphabetically before processing
-	// to ensure consistent ordering. File extensions are normalised to lowercase.
+	// {baseName}_00001.ext, {baseName}_00002.ext, etc. Files are sorted by date (EXIF or modification time)
+	// before processing to ensure chronological ordering. File extensions are normalised to lowercase.
 	//
 	// The target directory is created only if there are files to move. If no files match the filter,
 	// the target directory is not created and the method returns successfully.
@@ -55,11 +57,15 @@ type FileRenamer interface {
 }
 
 // fileRenamer implements the FileRenamer interface
-type fileRenamer struct{}
+type fileRenamer struct {
+	dateExtractor *AggregatedFileDateExtractor
+}
 
 // NewFileRenamer creates a new FileRenamer instance
-func NewFileRenamer() FileRenamer {
-	return &fileRenamer{}
+func NewFileRenamer(et *exiftool.Exiftool) FileRenamer {
+	return &fileRenamer{
+		dateExtractor: NewFileDateExtractor(et),
+	}
 }
 
 // RenameFilesWithPattern renames files in a directory based on a filter and naming pattern
@@ -72,6 +78,12 @@ func (r *fileRenamer) MoveAndRenameFilesWithPattern(sourceDir, targetDir, baseNa
 	return r.renameFilesWithPatternInDir(sourceDir, targetDir, baseName, filter, progressChan)
 }
 
+// fileWithDate holds a file path and its extracted date
+type fileWithDate struct {
+	path string
+	date time.Time
+}
+
 // renameFilesWithPatternInDir is the internal implementation
 func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName string, filter fileFilter, progressChan chan<- ProgressEvent) (int, error) {
 	entries, err := os.ReadDir(sourceDir)
@@ -79,20 +91,29 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 		return 0, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	// Collect files matching the filter
-	var filesToRename []string
+	// Collect files matching the filter with their dates
+	var filesWithDates []fileWithDate
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		filePath := filepath.Join(sourceDir, entry.Name())
 		if filter(filePath) {
-			filesToRename = append(filesToRename, filePath)
+			// Extract date for this file
+			date, err := r.dateExtractor.GetFileDate(filePath)
+			if err != nil {
+				logger.Warn("Failed to extract date, using zero time", "file", filePath, "error", err)
+				date = time.Time{} // Use zero time as fallback
+			}
+			filesWithDates = append(filesWithDates, fileWithDate{
+				path: filePath,
+				date: date,
+			})
 		}
 	}
 
 	// Nothing to rename
-	if len(filesToRename) == 0 {
+	if len(filesWithDates) == 0 {
 		return 0, nil
 	}
 
@@ -103,12 +124,14 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 		}
 	}
 
-	// Sort files for consistent ordering
-	sort.Strings(filesToRename)
+	// Sort files by date (oldest first)
+	sort.Slice(filesWithDates, func(i, j int) bool {
+		return filesWithDates[i].date.Before(filesWithDates[j].date)
+	})
 
 	// Rename each file with sequential numbering
-	totalFiles := len(filesToRename)
-	for i, file := range filesToRename {
+	totalFiles := len(filesWithDates)
+	for i, fileData := range filesWithDates {
 		// Emit progress event
 		if progressChan != nil {
 			select {
@@ -117,21 +140,21 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 				Current: i + 1,
 				Total:   totalFiles,
 				Message: fmt.Sprintf("Renaming file %d of %d", i+1, totalFiles),
-				File:    file,
+				File:    fileData.path,
 			}:
 			default:
 				logger.Debug("Progress event dropped (channel full)", "stage", "renaming")
 			}
 		}
 
-		ext := strings.ToLower(filepath.Ext(file))
+		ext := strings.ToLower(filepath.Ext(fileData.path))
 		newFileName := fmt.Sprintf("%s_%05d%s", baseName, i+1, ext)
 		newFilePath := filepath.Join(targetDir, newFileName)
 
-		if err := os.Rename(file, newFilePath); err != nil {
-			return 0, fmt.Errorf("failed to rename %s to %s: %w", file, newFilePath, err)
+		if err := os.Rename(fileData.path, newFilePath); err != nil {
+			return 0, fmt.Errorf("failed to rename %s to %s: %w", fileData.path, newFilePath, err)
 		}
 	}
 
-	return len(filesToRename), nil
+	return len(filesWithDates), nil
 }

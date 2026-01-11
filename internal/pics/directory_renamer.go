@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/acm19/pics/internal/logger"
+	"github.com/barasher/go-exiftool"
 )
 
 // DirectoryRenamer defines the interface for renaming date-based directories
@@ -23,10 +24,10 @@ type directoryRenamer struct {
 }
 
 // NewDirectoryRenamer creates a new DirectoryRenamer instance
-func NewDirectoryRenamer() DirectoryRenamer {
+func NewDirectoryRenamer(et *exiftool.Exiftool) DirectoryRenamer {
 	return &directoryRenamer{
 		extensions:  NewExtensions(),
-		fileRenamer: NewFileRenamer(),
+		fileRenamer: NewFileRenamer(et),
 	}
 }
 

@@ -53,7 +53,7 @@ func assertFilesExist(t *testing.T, dir string, filenames []string) {
 }
 
 func TestNewDirectoryRenamer(t *testing.T) {
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	if renamer == nil {
 		t.Error("Expected non-nil renamer")
 	}
@@ -71,7 +71,7 @@ func TestDirectoryRenamer_RenameDirectory_WithImages(t *testing.T) {
 	createTestImage(t, testDir, "img3.jpeg")
 
 	// Rename directory
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "vacation")
 
 	if err != nil {
@@ -103,7 +103,7 @@ func TestDirectoryRenamer_RenameDirectory_WithVideos(t *testing.T) {
 	createTestVideo(t, videosDir, "vid2.MOV")
 
 	// Rename directory
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "trip")
 
 	if err != nil {
@@ -138,7 +138,7 @@ func TestDirectoryRenamer_RenameDirectory_WithImagesAndVideos(t *testing.T) {
 	createTestVideo(t, videosDir, "vid1.mov")
 
 	// Rename directory
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "christmas")
 
 	if err != nil {
@@ -170,7 +170,7 @@ func TestDirectoryRenamer_RenameDirectory_EmptyName(t *testing.T) {
 	// Create test image
 	createTestImage(t, testDir, "img1.jpg")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "")
 
 	if err != nil {
@@ -199,7 +199,7 @@ func TestDirectoryRenamer_RenameDirectory_NoChange(t *testing.T) {
 	// Create test image
 	createTestImage(t, testDir, "img1.jpg")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "vacation")
 
 	if err != nil {
@@ -219,7 +219,7 @@ func TestDirectoryRenamer_RenameDirectory_NoChange(t *testing.T) {
 }
 
 func TestDirectoryRenamer_RenameDirectory_NonexistentDirectory(t *testing.T) {
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory("/nonexistent/directory", "newname")
 
 	if err == nil {
@@ -236,7 +236,7 @@ func TestDirectoryRenamer_RenameDirectory_NotADirectory(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(filePath, "newname")
 
 	if err == nil {
@@ -250,7 +250,7 @@ func TestDirectoryRenamer_RenameDirectory_InvalidFormat(t *testing.T) {
 	// Create directory with invalid format (missing parts)
 	testDir := createTestDirectory(t, tmpDir, "2023 06 June")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "newname")
 
 	if err == nil {
@@ -267,7 +267,7 @@ func TestDirectoryRenamer_RenameDirectory_TargetExists(t *testing.T) {
 	// Create target directory that will conflict
 	createTestDirectory(t, tmpDir, "2023 06 June 15 vacation")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "vacation")
 
 	if err == nil {
@@ -281,7 +281,7 @@ func TestDirectoryRenamer_RenameDirectory_NoFiles(t *testing.T) {
 	// Create empty directory
 	testDir := createTestDirectory(t, tmpDir, "2023 06 June 15")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "empty")
 
 	if err != nil {
@@ -306,7 +306,7 @@ func TestDirectoryRenamer_RenameDirectory_PreservesExtensionCase(t *testing.T) {
 	createTestImage(t, testDir, "img2.jpeg")
 	createTestImage(t, testDir, "img3.HEIC")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "test")
 
 	if err != nil {
@@ -341,7 +341,7 @@ func TestDirectoryRenamer_RenameDirectory_SortsFilesAlphabetically(t *testing.T)
 	createTestImage(t, testDir, "aaa.jpg")
 	createTestImage(t, testDir, "mmm.jpg")
 
-	renamer := NewDirectoryRenamer()
+	renamer := NewDirectoryRenamer(createTestExiftool(t))
 	err := renamer.RenameDirectory(testDir, "sorted")
 
 	if err != nil {

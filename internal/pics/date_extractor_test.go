@@ -65,7 +65,7 @@ func TestModTimeExtractor_Name(t *testing.T) {
 }
 
 func TestExifDateExtractor_Name(t *testing.T) {
-	extractor := newExifDateExtractor()
+	extractor := newExifDateExtractor(createTestExiftool(t))
 	if extractor.name() != "EXIF" {
 		t.Errorf("Expected name 'EXIF', got '%s'", extractor.name())
 	}
@@ -79,7 +79,7 @@ func TestAggregatedFileDateExtractor_FallbackToModTime(t *testing.T) {
 	testFile := createTestFileWithTime(t, tmpDir, "test.txt", testTime)
 
 	// Test the aggregated extractor
-	extractor := NewFileDateExtractor()
+	extractor := NewFileDateExtractor(createTestExiftool(t))
 	result, err := extractor.GetFileDate(testFile)
 
 	if err != nil {
@@ -91,7 +91,7 @@ func TestAggregatedFileDateExtractor_FallbackToModTime(t *testing.T) {
 }
 
 func TestAggregatedFileDateExtractor_NonexistentFile(t *testing.T) {
-	extractor := NewFileDateExtractor()
+	extractor := NewFileDateExtractor(createTestExiftool(t))
 	_, err := extractor.GetFileDate("/nonexistent/file.txt")
 
 	if err == nil {

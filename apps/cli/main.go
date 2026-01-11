@@ -9,6 +9,7 @@ import (
 
 	"github.com/acm19/pics/internal/logger"
 	"github.com/acm19/pics/internal/pics"
+	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
 )
 
@@ -89,6 +90,14 @@ func runParse(cmd *cobra.Command, args []string) {
 	sourceDir := args[0]
 	targetDir := args[1]
 
+	// Initialise exiftool for this command
+	et, err := exiftool.NewExiftool()
+	if err != nil {
+		logger.Error("Failed to initialise exiftool", "error", err)
+		os.Exit(1)
+	}
+	defer et.Close()
+
 	fileStats := pics.NewFileStats()
 	if err := fileStats.ValidateDirectories(sourceDir, targetDir); err != nil {
 		logger.Error("Directory validation failed", "error", err)
@@ -106,7 +115,8 @@ func runParse(cmd *cobra.Command, args []string) {
 	}
 
 	logger.Info("Starting media parsing", "source", sourceDir, "target", targetDir)
-	parser := pics.NewMediaParser()
+	organiser := pics.NewFileOrganiser(et)
+	parser := pics.NewMediaParser("", organiser)
 	if err := parser.Parse(sourceDir, targetDir, opts); err != nil {
 		logger.Error("Parse failed", "error", err)
 		os.Exit(1)
@@ -130,7 +140,15 @@ func runRename(cmd *cobra.Command, args []string) {
 	directory := args[0]
 	newName := args[1]
 
-	renamer := pics.NewDirectoryRenamer()
+	// Initialise exiftool for this command
+	et, err := exiftool.NewExiftool()
+	if err != nil {
+		logger.Error("Failed to initialise exiftool", "error", err)
+		os.Exit(1)
+	}
+	defer et.Close()
+
+	renamer := pics.NewDirectoryRenamer(et)
 	if err := renamer.RenameDirectory(directory, newName); err != nil {
 		logger.Error("Rename failed", "error", err)
 		os.Exit(1)
@@ -156,7 +174,7 @@ func runBackup(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 	backup, err := pics.NewS3Backup(ctx)
 	if err != nil {
-		logger.Error("Failed to initialize backup", "error", err)
+		logger.Error("Failed to initialise backup", "error", err)
 		os.Exit(1)
 	}
 
@@ -209,7 +227,7 @@ func runRestore(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 	backup, err := pics.NewS3Backup(ctx)
 	if err != nil {
-		logger.Error("Failed to initialize backup", "error", err)
+		logger.Error("Failed to initialise backup", "error", err)
 		os.Exit(1)
 	}
 
