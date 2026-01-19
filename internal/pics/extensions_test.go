@@ -49,7 +49,7 @@ func TestExtensions_IsVideo(t *testing.T) {
 		{"photo.jpg", false},
 		{"photo.heic", false},
 		{"document.txt", false},
-		{"file.avi", false},
+		{"file.avi", true},
 		{"/path/to/video.mov", true},
 		{"/path/to/video.MP4", true},
 	}
@@ -81,7 +81,7 @@ func TestExtensions_IsSupported(t *testing.T) {
 		{"video.MP4", true},
 		// Unsupported
 		{"document.txt", false},
-		{"file.avi", false},
+		{"file.avi", true},
 		{"file.gif", false},
 		{"/path/to/supported.jpg", true},
 		{"/path/to/supported.png", true},
@@ -160,6 +160,41 @@ func TestExtensions_NoExtension(t *testing.T) {
 		}
 		if ext.IsJPEG(filePath) {
 			t.Errorf("IsJPEG(%s) should be false for file without extension", filePath)
+		}
+	}
+}
+
+func TestExtensions_IsVideo_AllFormats(t *testing.T) {
+	ext := NewExtensions()
+
+	videoFormats := []string{
+		// Existing formats
+		"test.mov", "test.MOV",
+		"test.mp4", "test.MP4",
+		// Common formats
+		"test.avi", "test.AVI",
+		"test.mkv", "test.MKV",
+		"test.webm", "test.WEBM",
+		"test.flv", "test.FLV",
+		"test.wmv", "test.WMV",
+		"test.m4v", "test.M4V",
+		// Additional formats
+		"test.3gp", "test.3GP",
+		"test.m2ts", "test.M2TS",
+		"test.mts", "test.MTS",
+		"test.ogv", "test.OGV",
+		"test.ts", "test.TS",
+	}
+
+	for _, format := range videoFormats {
+		if !ext.IsVideo(format) {
+			t.Errorf("Expected %s to be recognised as video", format)
+		}
+		if !ext.IsSupported(format) {
+			t.Errorf("Expected %s to be recognised as supported", format)
+		}
+		if ext.IsImage(format) {
+			t.Errorf("Expected %s to NOT be recognised as image", format)
 		}
 	}
 }

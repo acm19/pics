@@ -28,7 +28,21 @@ type extensions struct {
 func NewExtensions() Extensions {
 	return &extensions{
 		imageExts: []string{".jpg", ".jpeg", ".heic", ".png"},
-		videoExts: []string{".mov", ".mp4"},
+		videoExts: []string{
+			".mov",   // QuickTime
+			".mp4",   // MPEG-4
+			".avi",   // Audio Video Interleave
+			".mkv",   // Matroska Video Container
+			".webm",  // WebM Video
+			".flv",   // Flash Video
+			".wmv",   // Windows Media Video
+			".m4v",   // MPEG-4 Video (Apple)
+			".3gp",   // 3GPP (mobile)
+			".m2ts",  // MPEG-2 Transport Stream
+			".mts",   // MPEG-2 Transport Stream
+			".ogv",   // Ogg Theora Video
+			".ts",    // MPEG-2 Transport Stream
+		},
 	}
 }
 

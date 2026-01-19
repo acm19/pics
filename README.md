@@ -10,7 +10,9 @@ For maintainers: see [RELEASING.md](RELEASING.md) for the release process.
 
 ## Features
 
-- Copies media files (JPG, JPEG, HEIC, MOV) from source subdirectories.
+- Copies media files from source subdirectories.
+  - **Supported image formats:** JPG, JPEG, HEIC, PNG
+  - **Supported video formats:** MOV, MP4, AVI, MKV, WEBM, FLV, WMV, M4V, 3GP, M2TS, MTS, OGV, TS
 - Optional JPEG compression with configurable quality.
 - Organises files into date-based directories (YYYY MM Month DD) using EXIF creation date when available.
 - Moves videos to separate subdirectories.

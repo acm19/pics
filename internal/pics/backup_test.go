@@ -218,10 +218,10 @@ func TestS3Backup_CountMediaFiles(t *testing.T) {
 			},
 			videoFiles: []string{
 				"clip.mov",
-				"video.avi", // Unsupported
+				"video.avi",
 			},
 			expectedImages: 2,
-			expectedVideos: 1,
+			expectedVideos: 2,
 		},
 	}
 
