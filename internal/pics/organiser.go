@@ -13,7 +13,6 @@ import (
 // FileOrganiser defines the interface for organising files
 type FileOrganiser interface {
 	// OrganiseByDate moves files to date-based directories.
-	// Before moving, stores the original filename in EXIF OriginalFileName field if it doesn't exist.
 	OrganiseByDate(sourceDir, targetDir string, progressChan chan<- ProgressEvent) error
 	// OrganiseVideosAndRenameImages organises videos into subdirectories and renames images sequentially.
 	// Uses FileRenamer which also stores original filenames in EXIF before renaming.
@@ -25,7 +24,6 @@ type fileOrganiser struct {
 	dateExtractor *AggregatedFileDateExtractor
 	extensions    Extensions
 	fileRenamer   FileRenamer
-	exifWriter    ExifWriter
 }
 
 // NewFileOrganiser creates a new FileOrganiser instance
@@ -34,7 +32,6 @@ func NewFileOrganiser(et *exiftool.Exiftool) FileOrganiser {
 		dateExtractor: NewFileDateExtractor(et),
 		extensions:    NewExtensions(),
 		fileRenamer:   NewFileRenamer(et),
-		exifWriter:    NewExifWriter(et),
 	}
 }
 
@@ -63,6 +60,13 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan
 			continue
 		}
 		filePath := filepath.Join(sourceDir, entry.Name())
+
+		// Skip invalid/corrupted files
+		if err := isValidFile(filePath); err != nil {
+			logger.Warn("Skipping file", "file", entry.Name(), "reason", err)
+			continue
+		}
+
 		current++
 
 		// Emit progress event
@@ -88,12 +92,6 @@ func (o *fileOrganiser) OrganiseByDate(sourceDir, targetDir string, progressChan
 			return err
 		}
 		logger.Debug("Date extracted", "file", entry.Name(), "date", fileDate)
-
-		// Store original filename in EXIF if this is the first time
-		if _, err := o.exifWriter.WriteOriginalFileNameIfMissing(filePath); err != nil {
-			logger.Warn("Failed to write OriginalFileName to EXIF", "file", filePath, "error", err)
-			// Continue with move even if EXIF write fails
-		}
 
 		dirName := fileDate.Format("2006 01 January 02")
 		destDir := filepath.Join(targetDir, dirName)

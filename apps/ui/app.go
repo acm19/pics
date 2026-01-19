@@ -97,8 +97,11 @@ func (a *App) Parse(opts ParseOptions) error {
 	// Create file organiser with shared exiftool instance
 	organiser := pics.NewFileOrganiser(a.exiftool)
 
-	// Create media parser with custom binary paths and organiser
-	parser := pics.NewMediaParser(a.jpegoptimPath, organiser)
+	// Create EXIF writer with shared exiftool instance
+	exifWriter := pics.NewExifWriter(a.exiftool)
+
+	// Create media parser with custom binary paths, organiser, and EXIF writer
+	parser := pics.NewMediaParser(a.jpegoptimPath, organiser, exifWriter)
 
 	// Create parse options with progress channel
 	parseOpts := pics.ParseOptions{

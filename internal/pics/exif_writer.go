@@ -19,7 +19,7 @@ type ExifWriter interface {
 	// WriteOriginalFileNameIfMissing writes the original filename to EXIF metadata
 	// if it doesn't already exist. Only processes image files (JPG, JPEG, HEIC, PNG).
 	// Returns true if the field was written, false if it already exists or file is not an image.
-	WriteOriginalFileNameIfMissing(filePath string) (bool, error)
+	WriteOriginalFileNameIfMissing(filePath string, originalFileName string) (bool, error)
 }
 
 // exifWriter implements the ExifWriter interface
@@ -37,7 +37,7 @@ func NewExifWriter(et *exiftool.Exiftool) ExifWriter {
 }
 
 // WriteOriginalFileNameIfMissing writes the original filename to EXIF metadata if it doesn't already exist
-func (w *exifWriter) WriteOriginalFileNameIfMissing(filePath string) (bool, error) {
+func (w *exifWriter) WriteOriginalFileNameIfMissing(filePath string, originalFileName string) (bool, error) {
 	if w.et == nil {
 		return false, fmt.Errorf("exiftool not initialised")
 	}
@@ -57,14 +57,13 @@ func (w *exifWriter) WriteOriginalFileNameIfMissing(filePath string) (bool, erro
 		}
 	}
 
-	// Get the original filename (without path)
-	originalName := filepath.Base(filePath)
-
 	// Use exiftool command-line to write the OriginalFileName tag
 	// -overwrite_original prevents creating backup files
+	// -P preserves the file modification date/time
 	cmd := exec.Command("exiftool",
-		"-"+ExifOriginalFileName+"="+originalName,
+		"-"+ExifOriginalFileName+"="+originalFileName,
 		"-overwrite_original",
+		"-P",
 		filePath)
 
 	output, err := cmd.CombinedOutput()
@@ -72,6 +71,6 @@ func (w *exifWriter) WriteOriginalFileNameIfMissing(filePath string) (bool, erro
 		return false, fmt.Errorf("failed to write %s: %w (output: %s)", ExifOriginalFileName, err, string(output))
 	}
 
-	logger.Debug("Wrote OriginalFileName to EXIF", "file", originalName)
+	logger.Debug("Wrote OriginalFileName to EXIF", "file", originalFileName)
 	return true, nil
 }

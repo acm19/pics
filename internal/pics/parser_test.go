@@ -17,8 +17,10 @@ var testParseOptions = ParseOptions{
 
 func createTestParser(t *testing.T) MediaParser {
 	t.Helper()
-	organiser := NewFileOrganiser(createTestExiftool(t))
-	return NewMediaParser("", organiser)
+	et := createTestExiftool(t)
+	organiser := NewFileOrganiser(et)
+	exifWriter := NewExifWriter(et)
+	return NewMediaParser("", organiser, exifWriter)
 }
 
 // Helper functions

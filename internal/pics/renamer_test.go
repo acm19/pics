@@ -1,6 +1,7 @@
 package pics
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -382,4 +383,37 @@ func parseTime(t *testing.T, timeStr string) time.Time {
 		t.Fatalf("Failed to parse time %s: %v", timeStr, err)
 	}
 	return parsed
+}
+
+func TestFileRenamer_NoOverwriteOnRename(t *testing.T) {
+	tmpDir := t.TempDir()
+	testDir := filepath.Join(tmpDir, "test")
+	if err := os.MkdirAll(testDir, 0755); err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+
+	// Create 5 files with sequential names but dates in reverse order
+	// This triggers the bug: sorting changes order, causing overwrites
+	for i := 0; i < 5; i++ {
+		filename := fmt.Sprintf("old_%05d.jpg", i+1)
+		date := parseTime(t, fmt.Sprintf("2023-06-15T%02d:00:00Z", 14-i)) // Reverse dates
+		createValidJPEGWithDate(t, testDir, filename, date)
+	}
+
+	renamer := NewFileRenamer(createTestExiftool(t))
+	ext := NewExtensions()
+	count, err := renamer.RenameFilesWithPattern(testDir, "new", ext.IsImage, nil)
+
+	if err != nil {
+		t.Fatalf("Rename failed: %v", err)
+	}
+	if count != 5 {
+		t.Errorf("Expected 5 files renamed, got: %d", count)
+	}
+
+	// Verify ALL files still exist (bug causes overwrites)
+	entries, _ := os.ReadDir(testDir)
+	if len(entries) != 5 {
+		t.Errorf("CRITICAL: Expected 5 files, got %d - files were overwritten!", len(entries))
+	}
 }

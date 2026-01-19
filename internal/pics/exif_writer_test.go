@@ -19,7 +19,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_FirstTime(t *testing.T) {
 	testFile := createValidJPEG(t, tmpDir, "test_image.jpg")
 
 	writer := NewExifWriter(createTestExiftool(t))
-	written, err := writer.WriteOriginalFileNameIfMissing(testFile)
+	written, err := writer.WriteOriginalFileNameIfMissing(testFile, "test_image.jpg")
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -37,7 +37,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_AlreadyExists(t *testing.T) {
 	writer := NewExifWriter(createTestExiftool(t))
 
 	// First write
-	written1, err := writer.WriteOriginalFileNameIfMissing(testFile)
+	written1, err := writer.WriteOriginalFileNameIfMissing(testFile, "test_image.jpg")
 	if err != nil {
 		t.Fatalf("First write failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_AlreadyExists(t *testing.T) {
 	}
 
 	// Second write (should skip)
-	written2, err := writer.WriteOriginalFileNameIfMissing(testFile)
+	written2, err := writer.WriteOriginalFileNameIfMissing(testFile, "test_image.jpg")
 	if err != nil {
 		t.Errorf("Second write failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_PreservesOriginal(t *testing.
 	writer := NewExifWriter(createTestExiftool(t))
 
 	// Write the original filename
-	_, err := writer.WriteOriginalFileNameIfMissing(testFile)
+	_, err := writer.WriteOriginalFileNameIfMissing(testFile, originalName)
 	if err != nil {
 		t.Fatalf("Failed to write EXIF: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_PreservesOriginal(t *testing.
 	}
 
 	// Try to write again with new filename (should not overwrite)
-	written, err := writer.WriteOriginalFileNameIfMissing(newPath)
+	written, err := writer.WriteOriginalFileNameIfMissing(newPath, newName)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_MultipleCalls(t *testing.T) {
 
 	// Multiple writes should all succeed but only first should write
 	for i := 0; i < 3; i++ {
-		written, err := writer.WriteOriginalFileNameIfMissing(testFile)
+		written, err := writer.WriteOriginalFileNameIfMissing(testFile, "photo.jpg")
 		if err != nil {
 			t.Errorf("Call %d failed: %v", i+1, err)
 		}
@@ -139,7 +139,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_DifferentExtensions(t *testin
 			testFile := createValidJPEG(t, tmpDir, tc.filename)
 			writer := NewExifWriter(createTestExiftool(t))
 
-			written, err := writer.WriteOriginalFileNameIfMissing(testFile)
+			written, err := writer.WriteOriginalFileNameIfMissing(testFile, tc.filename)
 			if err != nil {
 				t.Errorf("Failed for %s: %v", tc.filename, err)
 			}
@@ -155,7 +155,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_NonexistentFile(t *testing.T)
 	nonexistentFile := filepath.Join(tmpDir, "nonexistent.jpg")
 
 	writer := NewExifWriter(createTestExiftool(t))
-	_, err := writer.WriteOriginalFileNameIfMissing(nonexistentFile)
+	_, err := writer.WriteOriginalFileNameIfMissing(nonexistentFile, "nonexistent.jpg")
 
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
@@ -172,7 +172,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_SkipsVideoFiles(t *testing.T)
 			testFile := createFile(t, tmpDir, "video"+ext)
 			writer := NewExifWriter(createTestExiftool(t))
 
-			written, err := writer.WriteOriginalFileNameIfMissing(testFile)
+			written, err := writer.WriteOriginalFileNameIfMissing(testFile, "video"+ext)
 
 			if err != nil {
 				t.Errorf("Expected no error for video file, got: %v", err)
@@ -190,7 +190,7 @@ func TestExifWriter_WriteOriginalFileNameIfMissing_InvalidJPEG(t *testing.T) {
 	testFile := createFile(t, tmpDir, "invalid.jpg")
 
 	writer := NewExifWriter(createTestExiftool(t))
-	_, err := writer.WriteOriginalFileNameIfMissing(testFile)
+	_, err := writer.WriteOriginalFileNameIfMissing(testFile, "invalid.jpg")
 
 	// Should return an error because the file is not a valid JPEG
 	if err == nil {

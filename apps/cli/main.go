@@ -116,7 +116,8 @@ func runParse(cmd *cobra.Command, args []string) {
 
 	logger.Info("Starting media parsing", "source", sourceDir, "target", targetDir)
 	organiser := pics.NewFileOrganiser(et)
-	parser := pics.NewMediaParser("", organiser)
+	exifWriter := pics.NewExifWriter(et)
+	parser := pics.NewMediaParser("", organiser, exifWriter)
 	if err := parser.Parse(sourceDir, targetDir, opts); err != nil {
 		logger.Error("Parse failed", "error", err)
 		os.Exit(1)

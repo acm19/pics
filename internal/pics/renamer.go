@@ -108,6 +108,13 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 			continue
 		}
 		filePath := filepath.Join(sourceDir, entry.Name())
+
+		// Skip invalid/corrupted files
+		if err := isValidFile(filePath); err != nil {
+			logger.Warn("Skipping file", "file", filePath, "reason", err)
+			continue
+		}
+
 		if filter(filePath) {
 			// Extract date for this file
 			date, err := r.dateExtractor.GetFileDate(filePath)
@@ -143,17 +150,19 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 		return filesWithDates[i].date.Before(filesWithDates[j].date)
 	})
 
-	// Rename each file with sequential numbering
+	// Two-phase rename to avoid overwrites when reordering files
 	totalFiles := len(filesWithDates)
+	tempPaths := make([]string, totalFiles)
+
+	// Phase 1: Write EXIF and rename to temporary names
 	for i, fileData := range filesWithDates {
-		// Emit progress event
 		if progressChan != nil {
 			select {
 			case progressChan <- ProgressEvent{
 				Stage:   "renaming",
 				Current: i + 1,
 				Total:   totalFiles,
-				Message: fmt.Sprintf("Renaming file %d of %d", i+1, totalFiles),
+				Message: fmt.Sprintf("Preparing file %d of %d", i+1, totalFiles),
 				File:    fileData.path,
 			}:
 			default:
@@ -161,18 +170,28 @@ func (r *fileRenamer) renameFilesWithPatternInDir(sourceDir, targetDir, baseName
 			}
 		}
 
-		// Store original filename in EXIF if this is the first rename
-		if _, err := r.exifWriter.WriteOriginalFileNameIfMissing(fileData.path); err != nil {
+		originalName := filepath.Base(fileData.path)
+		if _, err := r.exifWriter.WriteOriginalFileNameIfMissing(fileData.path, originalName); err != nil {
 			logger.Warn("Failed to write OriginalFileName to EXIF", "file", fileData.path, "error", err)
-			// Continue with rename even if EXIF write fails
 		}
 
-		ext := strings.ToLower(filepath.Ext(fileData.path))
+		tempName := fmt.Sprintf(".tmp_rename_%05d%s", i, filepath.Ext(fileData.path))
+		tempPath := filepath.Join(targetDir, tempName)
+
+		if err := os.Rename(fileData.path, tempPath); err != nil {
+			return 0, fmt.Errorf("failed to rename %s to temp: %w", fileData.path, err)
+		}
+		tempPaths[i] = tempPath
+	}
+
+	// Phase 2: Rename from temporary to final names
+	for i, tempPath := range tempPaths {
+		ext := strings.ToLower(filepath.Ext(tempPath))
 		newFileName := fmt.Sprintf("%s_%05d%s", baseName, i+1, ext)
 		newFilePath := filepath.Join(targetDir, newFileName)
 
-		if err := os.Rename(fileData.path, newFilePath); err != nil {
-			return 0, fmt.Errorf("failed to rename %s to %s: %w", fileData.path, newFilePath, err)
+		if err := os.Rename(tempPath, newFilePath); err != nil {
+			return 0, fmt.Errorf("failed to rename temp to %s: %w", newFilePath, err)
 		}
 	}
 

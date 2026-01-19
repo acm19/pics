@@ -25,15 +25,17 @@ type mediaParser struct {
 	organiser  FileOrganiser
 	extensions Extensions
 	stats      FileStats
+	exifWriter ExifWriter
 }
 
 // NewMediaParser creates a new MediaParser with custom binary paths and shared exiftool instance
-func NewMediaParser(jpegoptimPath string, organiser FileOrganiser) MediaParser {
+func NewMediaParser(jpegoptimPath string, organiser FileOrganiser, exifWriter ExifWriter) MediaParser {
 	return &mediaParser{
 		compressor: NewImageCompressorWithPath(jpegoptimPath),
 		organiser:  organiser,
 		extensions: NewExtensions(),
 		stats:      NewFileStats(),
+		exifWriter: exifWriter,
 	}
 }
 
@@ -181,6 +183,15 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 			continue
 		}
 
+		// Store the original filename in EXIF metadata (before prefix was added)
+		originalName := filepath.Base(file.srcPath)
+		if _, err := p.exifWriter.WriteOriginalFileNameIfMissing(file.destPath, originalName); err != nil {
+			logger.Warn("Failed to write original filename to EXIF", "file", file.srcPath, "error", err)
+			// Continue processing even if EXIF write fails
+		} else {
+			logger.Debug("Stored original filename in EXIF", "original", originalName, "dest", file.destPath)
+		}
+
 		if file.isJPEG && opts.CompressJPEGs {
 			logger.Debug("Compressing file", "path", file.destPath)
 
@@ -232,6 +243,12 @@ func (p *mediaParser) discoverFiles(sourceDir, tmpTarget string, jobs chan<- fil
 		}
 
 		if info.IsDir() {
+			return nil
+		}
+
+		// Skip invalid/corrupted files
+		if err := isValidFile(path); err != nil {
+			logger.Warn("Skipping file", "file", path, "reason", err)
 			return nil
 		}
 
