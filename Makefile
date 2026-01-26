@@ -14,41 +14,66 @@ WAILS := go run github.com/wailsapp/wails/v2/cmd/wails@$(WAILS_VERSION)
 .DEFAULT_GOAL := help
 
 .PHONY: help
+.SILENT: help
 help:
-	@echo "Available targets:"
-	@echo "  make build         - Build CLI application"
-	@echo "  make build-cli     - Build CLI application"
-	@echo "  make build-ui      - Build UI application (downloads binaries if needed)"
-	@echo "  make local-install - Build and install CLI to ~/bin"
-	@echo "  make clean         - Clean all build artifacts and temporary files"
-	@echo "  make test          - Run tests"
-	@echo ""
-	@echo "Binary downloads (automatic):"
-	@echo "  make apps/ui/build/resources/linux/exiftool"
-	@echo "  make apps/ui/build/resources/linux/jpegoptim"
-	@echo "  (darwin and windows variants also available)"
+	echo "Available targets:"
+	echo ""
+	echo "Build:"
+	echo "  make build            - Build CLI application (alias for build-cli)"
+	echo "  make build-cli        - Build CLI application"
+	echo "  make build-ui         - Build UI application (downloads binaries if needed)"
+	echo "  make build-all        - Build both CLI and UI applications"
+	echo "  make local-install    - Build and install CLI to ~/bin"
+	echo ""
+	echo "Development:"
+	echo "  make dev-ui           - Run UI in development mode"
+	echo "  make run ARGS=\"...\"   - Run CLI with arguments (e.g., make run ARGS=\"parse /src /dst\")"
+	echo "  make test             - Run all tests"
+	echo "  make tidy             - Tidy all go modules"
+	echo "  make clean            - Clean all build artifacts and temporary files"
+	echo ""
+	echo "Release:"
+	echo "  make release-snapshot - Create release snapshot"
+	echo "  make release-test     - Validate release configuration"
+	echo ""
+	echo "Binary downloads:"
+	echo "  make download-binaries - Download all platform binaries"
+	echo ""
+	echo "Infrastructure (AWS):"
+	echo "  make infra-deploy     - Deploy infrastructure"
+	echo "  make infra-status     - Show infrastructure status"
+	echo "  make infra-outputs    - Show infrastructure outputs"
+	echo "  make infra-bucket-name - Show S3 bucket name"
+	echo "  make infra-validate   - Validate infrastructure configuration"
+	echo "  make infra-empty-bucket - Empty S3 bucket"
+	echo "  make infra-delete     - Delete infrastructure"
+	echo "  make infra-help       - Show infrastructure help"
 
 .PHONY: build
 build: build-cli
 
 .PHONY: clean
+.SILENT: clean
 clean:
-	@echo "Cleaning build artifacts..."
+	echo "Cleaning build artifacts..."
 	rm -f $(BINARY_NAME_CLI)
 	rm -f $(BINARY_NAME_UI)
 	rm -rf apps/ui/build/bin
 	rm -rf dist/
-	@echo "Cleaning downloaded binaries..."
+	echo "Cleaning downloaded binaries..."
 	rm -rf apps/ui/build/resources
-	@echo "Cleaning runtime extracted binaries..."
+	echo "Cleaning runtime extracted binaries..."
 	rm -rf /tmp/pics-ui-tools
-	@echo "Cleaning temporary directories..."
+	echo "Cleaning temporary directories..."
 	rm -rf /tmp/pics-*
-	@echo "✓ Clean complete"
+	echo "✓ Clean complete"
 
 .PHONY: build-cli
+.SILENT: build-cli
 build-cli:
+	echo "Building CLI..."
 	cd apps/cli && go build -ldflags="-s -w" -o ../../$(BINARY_NAME_CLI)
+	echo "✓ Built $(BINARY_NAME_CLI)"
 
 .PHONY: local-install
 .SILENT: local-install
@@ -59,6 +84,7 @@ local-install: build-cli
 	echo "✓ Installed $(BINARY_NAME_CLI) to ~/bin/$(BINARY_NAME_CLI)"
 
 .PHONY: build-ui
+.SILENT: build-ui
 build-ui: \
 	apps/ui/build/resources/windows/exiftool.exe \
 	apps/ui/build/resources/windows/jpegoptim.exe \
@@ -66,31 +92,43 @@ build-ui: \
 	apps/ui/build/resources/darwin/jpegoptim \
 	apps/ui/build/resources/linux/exiftool \
 	apps/ui/build/resources/linux/jpegoptim
+	echo "Building UI..."
 	cd apps/ui && $(WAILS) build -tags webkit2_41
+	echo "✓ Built $(BINARY_NAME_UI)"
 
 .PHONY: build-all
+.SILENT: build-all
 build-all: build-cli build-ui
+	echo "✓ Built all applications"
 
 .PHONY: dev-ui
+.SILENT: dev-ui
 dev-ui:
+	echo "Starting UI in development mode..."
 	cd apps/ui && $(WAILS) dev -tags webkit2_41
 
 .PHONY: run
-# Example: make run ARGS="parse /source /target"
+.SILENT: run
 run:
 	cd apps/cli && go run . $(ARGS)
 
 .PHONY: test
+.SILENT: test
 test:
+	echo "Running tests..."
 	go test -v ./...
 	cd apps/cli && go test -v ./...
 	cd apps/ui && go test -v ./...
+	echo "✓ All tests passed"
 
 .PHONY: tidy
+.SILENT: tidy
 tidy:
+	echo "Tidying modules..."
 	go mod tidy
 	cd apps/cli && go mod tidy
 	cd apps/ui && go mod tidy
+	echo "✓ Modules tidied"
 
 # Windows binaries
 apps/ui/build/resources/windows/exiftool.exe:
@@ -186,12 +224,18 @@ download-binaries: \
 	@echo "✓ All binaries ready!"
 
 .PHONY: release-snapshot
+.SILENT: release-snapshot
 release-snapshot:
+	echo "Creating release snapshot..."
 	$(GORELEASER) release --snapshot --clean
+	echo "✓ Release snapshot created"
 
 .PHONY: release-test
+.SILENT: release-test
 release-test:
+	echo "Validating release configuration..."
 	$(GORELEASER) check
+	echo "✓ Release configuration valid"
 
 # Infrastructure targets
 .PHONY: infra-deploy
