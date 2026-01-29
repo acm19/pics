@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/acm19/pics/apps/cli/completion"
 	"github.com/acm19/pics/internal/logger"
 	"github.com/acm19/pics/internal/pics"
 	"github.com/barasher/go-exiftool"
@@ -78,6 +79,10 @@ func init() {
 
 	// Add all subcommands
 	rootCmd.AddCommand(parseCmd, renameCmd, backupCmd, restoreCmd)
+
+	// Add autocomplete commands
+	rootCmd.AddCommand(completion.NewInstallCmd(rootCmd))
+	rootCmd.AddCommand(completion.NewUninstallCmd())
 }
 
 func main() {

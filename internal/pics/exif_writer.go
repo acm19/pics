@@ -60,7 +60,9 @@ func (w *exifWriter) WriteOriginalFileNameIfMissing(filePath string, originalFil
 	// Use exiftool command-line to write the OriginalFileName tag
 	// -overwrite_original prevents creating backup files
 	// -P preserves the file modification date/time
+	// -m ignores minor errors (e.g., truncated IFD directories in older files)
 	cmd := exec.Command("exiftool",
+		"-m",
 		"-"+ExifOriginalFileName+"="+originalFileName,
 		"-overwrite_original",
 		"-P",

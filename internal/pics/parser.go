@@ -214,8 +214,9 @@ func (p *mediaParser) processFileWorker(jobs <-chan fileToProcess, errChan chan<
 			}
 
 			if err := p.compressor.CompressFile(file.destPath, opts.JPEGQuality); err != nil {
-				errChan <- fmt.Errorf("failed to compress %s: %w", file.destPath, err)
-				continue
+				// Log warning and continue with uncompressed file
+				// This handles files with minor corruption (e.g., extraneous data after JPEG end marker)
+				logger.Warn("Failed to compress file, continuing with uncompressed version", "file", file.destPath, "error", err)
 			}
 		}
 

@@ -83,6 +83,46 @@ make build
 
 This creates a `pics` binary in the current directory.
 
+## Shell Autocomplete
+
+The `pics` CLI supports shell autocomplete for bash, zsh, fish, and powershell.
+
+### Installation
+
+Install autocomplete for your current shell:
+
+```bash
+pics install-autocomplete
+```
+
+The command will automatically detect your shell and install the completion script.
+
+### Manual Installation
+
+To install for a specific shell:
+
+```bash
+pics install-autocomplete --shell bash
+pics install-autocomplete --shell zsh
+pics install-autocomplete --shell fish
+pics install-autocomplete --shell powershell
+```
+
+### Uninstallation
+
+Remove autocomplete:
+
+```bash
+pics uninstall-autocomplete
+```
+
+### Supported Features
+
+Autocomplete provides suggestions for:
+- Commands: `parse`, `rename`, `backup`, `restore`
+- Flags: `--compress`, `--rate`, `--max-concurrent`, `--from`, `--to`
+- File paths and directories
+
 ## Usage
 
 ### Parse and organise media files
