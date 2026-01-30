@@ -61,6 +61,7 @@ release:
   draft: false
   prerelease: auto
   mode: replace
+  replace_existing_artifacts: true
   header: |
     ## Installation
 
@@ -69,14 +70,9 @@ release:
 
     **Linux/macOS:**
     ```bash
-    # Extract the archive
     tar -xzf pics-cli_*.tar.gz
-
-    # Make executable and move to PATH
     chmod +x pics
     sudo mv pics /usr/local/bin/
-
-    # Verify installation
     pics --version
     ```
 
@@ -84,7 +80,20 @@ release:
     Extract `pics-cli_Windows_*.zip` and add `pics.exe` to your PATH.
 
     ### Desktop UI (pics-ui)
-    Full-featured desktop application with bundled dependencies (coming soon).
+    Full-featured desktop application with bundled dependencies.
+
+    **Linux:**
+    ```bash
+    tar -xzf pics-ui_Linux_x86_64.tar.gz
+    chmod +x pics-ui
+    ./pics-ui
+    ```
+
+    **macOS:**
+    Extract `pics-ui_macOS_universal.zip` and drag `pics-ui.app` to Applications.
+
+    **Windows:**
+    Extract `pics-ui_Windows_x86_64.zip` and run `pics-ui.exe`.
 
     ### Dependencies (CLI only)
     - **ExifTool**: Required for EXIF data extraction.
