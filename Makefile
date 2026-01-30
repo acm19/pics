@@ -161,7 +161,7 @@ apps/ui/build/resources/darwin/exiftool:
 	@mkdir -p apps/ui/build/resources/darwin
 	@TMPDIR=$$(mktemp -d /tmp/pics-exiftool-darwin.XXXXXX) && \
 		cd $$TMPDIR && \
-		curl -L -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
+		curl -L -A "Mozilla/5.0" -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
 		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/darwin/ && \
@@ -189,7 +189,7 @@ apps/ui/build/resources/linux/exiftool:
 	@mkdir -p apps/ui/build/resources/linux
 	@TMPDIR=$$(mktemp -d /tmp/pics-exiftool-linux.XXXXXX) && \
 		cd $$TMPDIR && \
-		curl -L -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
+		curl -L -A "Mozilla/5.0" -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
 		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/linux/ && \
