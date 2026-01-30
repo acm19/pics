@@ -4,12 +4,12 @@ before:
   hooks:
     # Tidy all modules
     - go mod tidy
-    - cd apps/cli && go mod tidy
-    - cd apps/ui && go mod tidy
+    - go mod tidy -C apps/cli
+    - go mod tidy -C apps/ui
     # Test all modules
     - go test ./...
-    - cd apps/cli && go test ./...
-    - cd apps/ui && go test ./...
+    - go test -C apps/cli ./...
+    - go test -C apps/ui ./...
 
 builds:
   - id: cli
