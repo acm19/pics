@@ -12,7 +12,8 @@ before:
 
 builds:
   - id: cli
-    main: ./apps/cli
+    dir: apps/cli
+    main: .
     binary: pics
     env:
       - CGO_ENABLED=0
