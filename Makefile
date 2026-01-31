@@ -136,10 +136,12 @@ apps/ui/build/resources/windows/exiftool.exe:
 	@mkdir -p apps/ui/build/resources/windows
 	@TMPDIR=$$(mktemp -d /tmp/pics-exiftool-windows.XXXXXX) && \
 		cd $$TMPDIR && \
-		curl -L -o exiftool.zip "https://sourceforge.net/projects/exiftool/files/exiftool-$(EXIFTOOL_VERSION)_64.zip/download" && \
+		LATEST_VER=$$(curl -sL "https://exiftool.org/" | grep -oE 'exiftool-[0-9.]+_64\.zip' | head -1 | sed 's/exiftool-\(.*\)_64\.zip/\1/') && \
+		echo "Detected latest version: $$LATEST_VER" && \
+		curl -L -A "Mozilla/5.0" -o exiftool.zip "https://exiftool.org/exiftool-$${LATEST_VER}_64.zip" && \
 		unzip -q exiftool.zip && \
 		chmod -R u+w . && \
-		cp "exiftool-$(EXIFTOOL_VERSION)_64/exiftool(-k).exe" $(CURDIR)/apps/ui/build/resources/windows/exiftool.exe && \
+		cp exiftool-$${LATEST_VER}_64/exiftool*.exe $(CURDIR)/apps/ui/build/resources/windows/exiftool.exe && \
 		cd /tmp && rm -rf $$TMPDIR
 	@echo "✓ exiftool.exe downloaded"
 
@@ -161,11 +163,11 @@ apps/ui/build/resources/darwin/exiftool:
 	@mkdir -p apps/ui/build/resources/darwin
 	@TMPDIR=$$(mktemp -d /tmp/pics-exiftool-darwin.XXXXXX) && \
 		cd $$TMPDIR && \
-		curl -L -A "Mozilla/5.0" -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
+		curl -L -o exiftool.tar.gz "https://github.com/exiftool/exiftool/archive/refs/tags/$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
-		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/darwin/ && \
-		cp Image-ExifTool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/darwin/exiftool && \
+		cp -r exiftool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/darwin/ && \
+		cp exiftool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/darwin/exiftool && \
 		chmod +x $(CURDIR)/apps/ui/build/resources/darwin/exiftool && \
 		cd /tmp && rm -rf $$TMPDIR
 	@echo "✓ exiftool downloaded"
@@ -189,11 +191,11 @@ apps/ui/build/resources/linux/exiftool:
 	@mkdir -p apps/ui/build/resources/linux
 	@TMPDIR=$$(mktemp -d /tmp/pics-exiftool-linux.XXXXXX) && \
 		cd $$TMPDIR && \
-		curl -L -A "Mozilla/5.0" -o exiftool.tar.gz "https://exiftool.org/Image-ExifTool-$(EXIFTOOL_VERSION).tar.gz" && \
+		curl -L -o exiftool.tar.gz "https://github.com/exiftool/exiftool/archive/refs/tags/$(EXIFTOOL_VERSION).tar.gz" && \
 		tar -xzf exiftool.tar.gz && \
 		chmod -R u+w . && \
-		cp -r Image-ExifTool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/linux/ && \
-		cp Image-ExifTool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/linux/exiftool && \
+		cp -r exiftool-$(EXIFTOOL_VERSION)/lib $(CURDIR)/apps/ui/build/resources/linux/ && \
+		cp exiftool-$(EXIFTOOL_VERSION)/exiftool $(CURDIR)/apps/ui/build/resources/linux/exiftool && \
 		chmod +x $(CURDIR)/apps/ui/build/resources/linux/exiftool && \
 		cd /tmp && rm -rf $$TMPDIR
 	@echo "✓ exiftool downloaded"
