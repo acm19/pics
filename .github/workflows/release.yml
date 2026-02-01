@@ -62,9 +62,13 @@ jobs:
           make apps/ui/build/resources/linux/exiftool
           make apps/ui/build/resources/linux/jpegoptim
 
+      - name: Build frontend
+        working-directory: apps/ui/frontend
+        run: npm ci && npm run build
+
       - name: Build UI
         working-directory: apps/ui
-        run: wails build -tags webkit2_41 -platform linux/amd64
+        run: wails build -tags webkit2_41 -s -platform linux/amd64
 
       - name: Package artefact
         run: |
@@ -106,9 +110,13 @@ jobs:
           make apps/ui/build/resources/windows/exiftool.exe
           make apps/ui/build/resources/windows/jpegoptim.exe
 
+      - name: Build frontend
+        working-directory: apps/ui/frontend
+        run: npm ci && npm run build
+
       - name: Build UI
         working-directory: apps/ui
-        run: wails build -platform windows/amd64
+        run: wails build -s -platform windows/amd64
 
       - name: Package artefact
         shell: pwsh
@@ -144,9 +152,13 @@ jobs:
           make apps/ui/build/resources/darwin/exiftool
           make apps/ui/build/resources/darwin/jpegoptim
 
+      - name: Build frontend
+        working-directory: apps/ui/frontend
+        run: npm ci && npm run build
+
       - name: Build UI (Universal)
         working-directory: apps/ui
-        run: wails build -platform darwin/universal
+        run: wails build -s -platform darwin/universal
 
       - name: Package artefact
         run: |
