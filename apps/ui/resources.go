@@ -1,23 +1,11 @@
 package main
 
 import (
-	"embed"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 )
-
-//go:embed build/resources/windows/exiftool.exe
-//go:embed build/resources/windows/jpegoptim.exe
-//go:embed build/resources/darwin/exiftool
-//go:embed build/resources/darwin/jpegoptim
-//go:embed build/resources/darwin/lib
-//go:embed build/resources/linux/exiftool
-//go:embed build/resources/linux/jpegoptim
-//go:embed build/resources/linux/lib
-var resources embed.FS
 
 // ExtractBinaries extracts the platform-specific exiftool and jpegoptim binaries
 // to a temporary directory and returns their paths.
@@ -28,43 +16,38 @@ func ExtractBinaries() (exiftoolPath, jpegoptimPath string, err error) {
 		return "", "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Determine platform
-	platform := runtime.GOOS
-	ext := ""
-	if platform == "windows" {
-		ext = ".exe"
-	}
-
 	// Extract exiftool
-	exiftoolSrc := fmt.Sprintf("build/resources/%s/exiftool%s", platform, ext)
-	exiftoolPath = filepath.Join(tempDir, "exiftool"+ext)
+	exiftoolSrc := fmt.Sprintf("build/resources/%s/exiftool%s", platformDir, platformExt)
+	exiftoolPath = filepath.Join(tempDir, "exiftool"+platformExt)
 	if err := extractFile(exiftoolSrc, exiftoolPath); err != nil {
 		return "", "", fmt.Errorf("failed to extract exiftool: %w", err)
 	}
 
-	// Make executable on Unix systems
-	if platform != "windows" {
+	// Make executable and extract lib on Unix systems
+	if platformExt == "" {
 		if err := os.Chmod(exiftoolPath, 0755); err != nil {
 			return "", "", fmt.Errorf("failed to make exiftool executable: %w", err)
 		}
 
-		// Extract lib directory for exiftool
-		libSrc := fmt.Sprintf("build/resources/%s/lib", platform)
-		libDest := filepath.Join(tempDir, "lib")
-		if err := extractDir(libSrc, libDest); err != nil {
-			return "", "", fmt.Errorf("failed to extract exiftool lib: %w", err)
+		if hasLib {
+			// Extract lib directory for exiftool
+			libSrc := fmt.Sprintf("build/resources/%s/lib", platformDir)
+			libDest := filepath.Join(tempDir, "lib")
+			if err := extractDir(libSrc, libDest); err != nil {
+				return "", "", fmt.Errorf("failed to extract exiftool lib: %w", err)
+			}
 		}
 	}
 
 	// Extract jpegoptim
-	jpegoptimSrc := fmt.Sprintf("build/resources/%s/jpegoptim%s", platform, ext)
-	jpegoptimPath = filepath.Join(tempDir, "jpegoptim"+ext)
+	jpegoptimSrc := fmt.Sprintf("build/resources/%s/jpegoptim%s", platformDir, platformExt)
+	jpegoptimPath = filepath.Join(tempDir, "jpegoptim"+platformExt)
 	if err := extractFile(jpegoptimSrc, jpegoptimPath); err != nil {
 		return "", "", fmt.Errorf("failed to extract jpegoptim: %w", err)
 	}
 
 	// Make executable on Unix systems
-	if platform != "windows" {
+	if platformExt == "" {
 		if err := os.Chmod(jpegoptimPath, 0755); err != nil {
 			return "", "", fmt.Errorf("failed to make jpegoptim executable: %w", err)
 		}
