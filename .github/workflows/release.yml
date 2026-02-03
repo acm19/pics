@@ -66,6 +66,9 @@ jobs:
         working-directory: apps/ui/frontend
         run: npm ci
 
+      - name: Create frontend dist placeholder
+        run: mkdir -p apps/ui/frontend/dist && touch apps/ui/frontend/dist/.gitkeep
+
       - name: Build UI
         working-directory: apps/ui
         run: wails build -tags webkit2_41 -platform linux/amd64
@@ -114,6 +117,9 @@ jobs:
         working-directory: apps/ui/frontend
         run: npm ci
 
+      - name: Create frontend dist placeholder
+        run: mkdir -p apps/ui/frontend/dist && touch apps/ui/frontend/dist/.gitkeep
+
       - name: Build UI
         working-directory: apps/ui
         run: wails build -platform windows/amd64
@@ -155,6 +161,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: apps/ui/frontend
         run: npm ci
+
+      - name: Create frontend dist placeholder
+        run: mkdir -p apps/ui/frontend/dist && touch apps/ui/frontend/dist/.gitkeep
 
       - name: Build UI (Universal)
         working-directory: apps/ui
