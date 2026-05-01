@@ -80,7 +80,7 @@ jobs:
           mv pics-ui_Linux_x86_64.tar.gz ${{ github.workspace }}/
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: pics-ui_Linux_x86_64.tar.gz
 
@@ -129,7 +129,7 @@ jobs:
         run: Compress-Archive -Path "apps/ui/build/bin/pics-ui.exe" -DestinationPath "pics-ui_Windows_x86_64.zip"
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: pics-ui_Windows_x86_64.zip
 
@@ -176,6 +176,6 @@ jobs:
           mv pics-ui_macOS_universal.zip ${{ github.workspace }}/
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: pics-ui_macOS_universal.zip
